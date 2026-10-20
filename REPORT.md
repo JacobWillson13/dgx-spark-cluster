@@ -6,13 +6,13 @@ Jacob Willson · October 2026
 
 Two NVIDIA DGX Spark systems were joined over a direct 200 GbE ConnectX-7 cable and run as one vLLM inference cluster. The work had two stages: a pilot that compared parallelism strategies with predictions recorded in advance, and a calibration phase that moved to a native software stack and built a correctness-gated measurement method.
 
-Five results stand out.
+Main results:
 
-- **The link reaches 196.03 Gb/s, 98% of line rate, but only when both PCIe paths are driven at once.** One path caps near 112 Gb/s at any frame size.
-- **Tensor parallelism beats pipeline parallelism across the wire,** by 2.01x on single-stream decode and 1.65x at concurrency 32. The pilot predicted the opposite.
-- **A second node helps even when the model fits on one.** Splitting a 27B model gave 1.57x single-stream throughput and 1.77x faster per-token latency, also contrary to prediction.
-- **Decode is governed by memory bandwidth, plus a constant.** Single-stream decode reached 87.7% of the 273 GB/s ceiling, and every configuration paid about 30 ms per forward pass on top of weight streaming in eager mode.
-- **On the native stack, throughput claims need a correctness gate.** Fast output can be wrong output. Every configuration here had to return correct, uncontaminated answers under load before its numbers counted.
+- **Link bandwidth:** 196.03 Gb/s, 98% of line rate, with both PCIe paths driven at once. One path reaches about 112 Gb/s at any frame size.
+- **Tensor versus pipeline parallelism:** TP2 was 2.01x faster than PP2 on single-stream decode and 1.65x faster at concurrency 32 (Llama 3.3 70B). The pilot predicted PP2 would win.
+- **One node versus two:** splitting Qwen3.8 27B across both nodes gave 1.57x single-stream throughput and 1.77x lower per-token latency, although the model fits on one node. The pilot predicted no single-stream gain.
+- **Decode efficiency:** single-stream decode reached 87.7% of the 273 GB/s memory-bandwidth ceiling. In eager mode, every configuration also paid about 30 ms per forward pass beyond weight streaming.
+- **Correctness gate:** on the native stack, each configuration had to return correct answers, with no cross-request contamination, under concurrent load before its throughput was counted.
 
 ![Line rate needs both PCIe paths](figures/interconnect.png)
 
@@ -35,7 +35,7 @@ Two networks with separate jobs:
 
 Keeping them apart means an administrative session cannot disturb a benchmark, and a benchmark cannot lock an operator out.
 
-![Two Sparks, one cluster: a laptop and switch on the management network, two DGX Sparks joined by one ConnectX-7 cable](figures/topology.png)
+![Cluster topology: a laptop and switch on the management network, two DGX Sparks joined by one ConnectX-7 cable](figures/topology.png)
 
 ## 3. Interconnect
 
