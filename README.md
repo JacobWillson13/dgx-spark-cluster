@@ -35,10 +35,13 @@ Predictions were recorded before each pilot experiment and scored afterward (rep
 | Fixed overhead | Pilot, eager mode, all configurations | about 30 ms per forward pass |
 | KV-cache capacity | Qwen3.8 27B, relative to BF16 | NVFP4 weights 1.64x; FP8 KV cache 1.35x |
 | Single-node throughput | Qwen3.8 27B, native stack, concurrency 64 | 120.7 tok/s; ceiling about 191 sequences |
+| Eager vs compiled | Qwen3.8 27B one node, concurrency 1 | 230 vs 210 ms per token; constant 29 to 9 ms |
+| Eager vs compiled | Llama 3.3 70B TP2, concurrency 1 | 289 vs 290 ms per token; constant unchanged |
+| GSM8K by precision | Qwen3.8 27B, 200 items | BF16 67.5%, FP8 70.5%, NVFP4 62.0% |
 
 ![Tensor parallelism versus pipeline parallelism, Llama 3.3 70B](figures/tp_vs_pp.png)
 
-**Status:** the pilot ran in eager mode. A rerun of the pilot on the compiled native stack is planned; report section 8 lists its predictions, and results will be added there.
+**Status:** complete. The pilot ran in eager mode; a closing rerun on the compiled native stack, with predictions committed in advance, is in [report section 8](REPORT.md#8-revisiting-the-pilot-on-the-compiled-stack).
 
 ## Setup screenshots
 

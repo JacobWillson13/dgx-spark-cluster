@@ -1,0 +1,2 @@
+run_id,outcome,stop_reason,failure_line,minutes_to_stop,g0,c1_output_tok_s,c1_median_tpot_ms
+C-DEEPSEEK,STOCK_FAILURE,Stock T2 recipe rejected default KV cache dtype before weight loading; one attempt exhausted,"AssertionError: DeepseekV4 fp8_ds_mla layout only supports fp8 kv-cache, got auto",0.6306971117999638,NOT_RUN,,

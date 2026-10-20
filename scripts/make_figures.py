@@ -145,7 +145,7 @@ def eager_vs_compiled():
         print("skip eager_vs_compiled.png (no results/closing/pilot_rerun.csv yet)")
         return
     pilot = {(x["model"], x["config"], x["concurrency"]): x for x in rows(RES / "pilot" / "runs.csv")}
-    topo = {"one node": "single node", "single node": "single node", "TP2": "TP2"}
+    topo = {"1N": "single node", "one node": "single node", "single node": "single node", "TP2": "TP2"}
     pairs = []
     for x in rows(path):
         if x["concurrency"] != "1":
@@ -163,8 +163,9 @@ def eager_vs_compiled():
     label_bars(ax, list(b1) + list(b2), lambda v: f"{v:.0f}")
     ax.set_xticks(list(xs), [p[0] for p in pairs])
     ax.set_ylabel("Median time per output token (ms)")
-    ax.legend(loc="upper left", frameon=False, fontsize=9)
-    title(fig, "Removing the eager-mode constant", "Concurrency 1, 1024 input / 256 output tokens.")
+    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=2, frameon=False, fontsize=9)
+    title(fig, "CUDA graphs helped Qwen, not Llama",
+          "Concurrency 1, 1024 input / 256 output tokens. Pilot in eager mode; rerun on the native compiled stack.")
     save(fig, "eager_vs_compiled.png")
 
 
