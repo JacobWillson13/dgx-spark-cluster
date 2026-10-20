@@ -1,0 +1,5 @@
+run_id,model,size_bytes,num_hidden_layers,eager_us,graph_us,collectives_per_token,comm_ms_per_token
+F-ALLREDUCE-1-QWEN,Qwen3.8-27B,10240,64,17.91,52.69,128,6.74432
+F-ALLREDUCE-1-LLAMA,Llama-3.3-70B-Instruct,16384,80,19.39,53.93,160,8.6288
+F-ALLREDUCE-2-QWEN,Qwen3.8-27B,10240,64,18.44,57.6,128,7.3728
+F-ALLREDUCE-2-LLAMA,Llama-3.3-70B-Instruct,16384,80,19.78,56.03,160,8.964799999999999
