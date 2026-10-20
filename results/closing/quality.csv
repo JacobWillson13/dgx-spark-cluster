@@ -1,0 +1,5 @@
+run_id,precision,gsm8k_flexible,gsm8k_strict,n_items,g0
+C-QUALITY-BF16,bf16,,,0,INCOMPLETE
+C-QUALITY-BF16-R2,bf16,0.675,0.65,200,PASS
+C-QUALITY-FP8,fp8,0.705,0.675,200,PASS
+C-QUALITY-NVFP4,nvfp4,0.62,0.57,200,PASS

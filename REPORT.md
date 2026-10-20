@@ -4,7 +4,7 @@ Jacob Willson · October 2026
 
 ## 1. Summary
 
-Two NVIDIA DGX Spark systems were joined over a direct 200 GbE ConnectX-7 cable and run as one vLLM inference cluster. The work had two stages: a pilot that compared parallelism strategies with predictions recorded in advance, and a calibration phase that moved to a native software stack and built a correctness-gated measurement method.
+Two NVIDIA DGX Spark systems were joined over a direct 200 GbE ConnectX-7 cable and run as one vLLM inference cluster. The work had three stages: a pilot that compared parallelism strategies with predictions recorded in advance, a calibration phase that moved to a native software stack and built a correctness-gated measurement method, and a closing rerun of the pilot on that stack.
 
 Main results:
 
@@ -12,6 +12,7 @@ Main results:
 - **Tensor versus pipeline parallelism:** TP2 was 2.01x faster than PP2 on single-stream decode and 1.65x faster at concurrency 32 (Llama 3.3 70B). The pilot predicted PP2 would win.
 - **One node versus two:** splitting Qwen3.8 27B across both nodes gave 1.57x single-stream throughput and 1.77x lower per-token latency, although the model fits on one node. The pilot predicted no single-stream gain.
 - **Decode efficiency:** single-stream decode reached 87.7% of the 273 GB/s memory-bandwidth ceiling. In eager mode, every configuration also paid about 30 ms per forward pass beyond weight streaming.
+- **Compiled stack:** CUDA graphs removed most of the 30 ms constant on Qwen3.8 27B (29 to 9 ms on one node, about 30 to 15 ms with TP2) and none of it on Llama 3.3 70B TP2. Two of five closing predictions held.
 - **Correctness gate:** on the native stack, each configuration had to return correct answers, with no cross-request contamination, under concurrent load before its throughput was counted.
 
 ![Line rate needs both PCIe paths](figures/interconnect.png)
@@ -198,27 +199,66 @@ The gate also showed why simpler checks fail. At temperature 0, vLLM output is *
 
 ## 8. Revisiting the pilot on the compiled stack
 
-*Predictions recorded before the runs; results pending.*
+Section 6.3 claimed the eager-mode numbers were floors and that CUDA graphs would remove most of the 30 ms constant. The closing session reran the pilot's Qwen and Llama TP2 cells on the native compiled stack to test that, with predictions committed before the first run.
 
-Section 6.3 claimed the eager-mode numbers were floors and that CUDA graphs would remove most of the 30 ms constant. The closing session reruns the pilot's Qwen and Llama TP2 cells on the native compiled stack, same workload, to test that.
+Same workload as the pilot: random dataset, 1024 input / 256 output tokens, seed 0, concurrency 1 and 32. Differences, all intentional: vLLM 0.29.0 native, CUDA graphs on (full and piecewise capture, batch sizes 1 to 128, confirmed in both two-node server logs), `--load-format fastsafetensors`, `--generation-config vllm`, two warmup requests, and 10 / 160 prompts instead of 5 / 64. Every configuration passed the section 7.1 gate before its numbers counted.
 
-| Config | Weight streaming | Pilot median TPOT (eager) | Predicted (compiled) | Measured |
-|---|---:|---:|---:|---:|
-| Qwen3.8 27B, one node | 201 ms | 230.1 ms | 203 to 212 ms | pending |
-| Qwen3.8 27B, TP2 | 100.5 ms | 130.4 ms | 103 to 115 ms | pending |
-| Llama 3.3 70B, TP2 | 259 ms | 289.2 ms | 261 to 272 ms | pending |
+| Config | Weight streaming | Pilot median TPOT (eager) | Predicted (compiled) | Measured | Outcome |
+|---|---:|---:|---:|---:|---|
+| Qwen3.8 27B, one node | 201 ms | 230.1 ms | 203 to 212 ms | 210.1 ms | **Confirmed** |
+| Qwen3.8 27B, TP2 | 100.5 ms | 130.4 ms | 103 to 115 ms | 115.3 ms | **Missed** by 0.3 ms |
+| Llama 3.3 70B, TP2 | 259 ms | 289.2 ms | 261 to 272 ms | 290.0 ms | **Falsified** |
 
-| Prediction | Pilot | Predicted | Outcome |
-|---|---|---|---|
-| Residual per-token overhead at concurrency 1 | ~30 ms | 12 ms or less | pending |
-| Qwen two-node per-token speedup | 1.77x | 1.80x to 1.95x | pending |
-| Output tok/s at concurrency 32 | see section 6 | 5% to 35% higher | pending |
-| DeepSeek V4 Flash 0731 NVFP4, stock stack, TP2 | not run | more likely fails to load or fails the gate than serves | pending |
-| GSM8K exact match, 200 items, vs BF16 | not run | FP8 within 2 points, NVFP4 within 3 | pending |
+![CUDA graphs helped Qwen, not Llama](figures/eager_vs_compiled.png)
+
+| Prediction | Pilot | Predicted | Measured | Outcome |
+|---|---|---|---|---|
+| Residual per-token overhead at concurrency 1 | ~30 ms | 12 ms or less in all three | 9.1 / 14.8 / 31.0 ms | **Falsified:** met on one node only |
+| Qwen two-node per-token speedup | 1.77x | 1.80x to 1.95x | 1.82x | **Confirmed** |
+| Output tok/s at concurrency 32 | 72.69 / 120.34 / 65.31 | each 5% to 35% higher | 86.70 (+19.3%) / 150.24 (+24.8%) / 64.07 (-1.9%) | **Falsified** on Llama |
+| DeepSeek V4 Flash 0731 NVFP4, stock stack, TP2 | not run | more likely fails to load or fails the gate than serves | failed before loading weights | **Confirmed** |
+| GSM8K, 200 items, relative to BF16 | not run | FP8 within 2 points, NVFP4 within 3 | FP8 +3.0, NVFP4 -5.5 | **Falsified** as stated; see 8.3 |
+
+Two of five held. Data: [`results/closing/`](results/closing/).
+
+### 8.1 The constant is gone on Qwen and untouched on Llama
+
+CUDA graphs cut the residual from 29 ms to 9 ms on one node and from about 30 ms to 15 ms for Qwen under TP2. On Llama TP2 it did not move: 30.2 ms eager, 31.0 ms compiled. Throughput at concurrency 32 tells the same story: Qwen gained 19% and 25%, Llama lost 2%.
+
+Graph capture was confirmed in the Llama log, including batch size 1, so the remaining constant is not kernel-launch overhead. It is also not link bandwidth: Llama moved 6.50 MB per output token over RDMA, under 0.3 ms at 24.5 GB/s. What it is was not isolated. The next measurement is a profile of one Llama decode step, or an all-reduce latency test at Llama's message size.
+
+The practical reading: for a model that fits on one node, compiled execution brings decode within 5% of the memory-bandwidth ceiling. For the 70B model that needs two nodes, about 31 ms per token is still unaccounted for.
+
+### 8.2 DeepSeek V4 Flash on the stock stack
+
+The launch failed 38 seconds in, before loading weights:
+
+```text
+AssertionError: DeepseekV4 fp8_ds_mla layout only supports fp8 kv-cache, got auto
+```
+
+This is further than the pilot got. vLLM 0.29.0 recognizes the architecture; the model requires an FP8 KV cache that the standard two-node recipe does not set. The plan allowed one stock attempt with no changes, so `--kv-cache-dtype fp8` was not tried. Whether DeepSeek V4 Flash serves on this stack, and passes the correctness gate, is still open.
+
+### 8.3 Precision and answer quality
+
+Qwen3.8 27B on one node at each precision, full gate first, then GSM8K: 200 items, 5-shot, greedy, through the completions endpoint.
+
+| Precision | Flexible extract | Strict match | Flexible vs BF16 |
+|---|---:|---:|---:|
+| BF16 | 67.5% | 65.0% | |
+| FP8 | 70.5% | 67.5% | +3.0 |
+| NVFP4 | 62.0% | 57.0% | -5.5 |
+
+At 200 items, each score carries a 95% interval of about plus or minus 6.5 points. Bands of 2 and 3 points were narrower than this sample can resolve, which is a flaw in the prediction, not a finding. FP8 scoring above BF16 is within noise. NVFP4 is lowest on both metrics (8 points lower on strict match), which is suggestive but not conclusive at this size. Per-item outputs were logged, so a paired comparison on the same 200 items is possible without more cluster time.
+
+The absolute scores reflect this harness (raw completions prompts, no chat template, thinking off) and should not be compared with published GSM8K results. Compare across precisions only.
 
 ## 9. Known limits
 
 - **Nemotron 3 Super 120B (NVFP4) did not serve.** With every kernel prebuilt offline, the launch completed CUDA graph capture, then free memory fell below 6 GiB during MoE kernel autotuning (peak 115.9 GiB in use). The memory watchdog stopped it, as designed. The allocation behind the growth was not isolated.
+- **Llama 3.3 70B TP2 keeps a 31 ms constant with CUDA graphs on.** Graph capture was confirmed; the cause was not profiled (section 8.1).
+- **DeepSeek V4 Flash did not serve.** One stock attempt failed on a KV-cache dtype requirement; a launch with an FP8 KV cache was not tried (section 8.2).
+- **Quality checks are small.** GSM8K at 200 items resolves differences of about 6.5 points, and absolute scores are specific to this harness (section 8.3).
 - **Gemma 4 was not served.** The test plan required someone physically present in case a launch hung the machine, and that session did not happen.
 - **No full concurrency sweep.** The single-node ceiling was located (about 191 sequences), but the accepted throughput curve at each configuration's ceiling was not run.
 - **Power is board-reported.** GPU-reported SoC power, not wall power.
