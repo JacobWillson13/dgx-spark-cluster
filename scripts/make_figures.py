@@ -263,9 +263,9 @@ def topology():
             "running out stalls the whole node. Every\nlaunch runs under a memory watchdog.",
             fontsize=8.8, color=INK2, va="center", linespacing=1.4, zorder=3)
 
-    ax.text(0.25, H - 0.22, "Two Sparks, one cluster", fontsize=16, weight="semibold", color=INK, va="top")
-    ax.text(0.25, H - 0.6, "Two networks with separate jobs: the switch carries management, "
-            "the cable carries every byte of inference traffic.", fontsize=10, color=INK2, va="top")
+    ax.text(0.25, H - 0.22, "Cluster topology", fontsize=16, weight="semibold", color=INK, va="top")
+    ax.text(0.25, H - 0.6, "Management network through a switch; inference traffic on a direct "
+            "ConnectX-7 link.", fontsize=10, color=INK2, va="top")
     ax.set_xlim(0, W)
     ax.set_ylim(0, H)
     save(fig, "topology.png")
