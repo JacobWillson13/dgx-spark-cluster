@@ -1,22 +1,46 @@
-# Two DGX Sparks, One Cable
+# Multi-Node LLM Inference on Two NVIDIA DGX Sparks
 
-What a second NVIDIA DGX Spark actually buys for LLM inference, measured. Two GB10 systems joined by a direct 200 GbE ConnectX-7 link, serving models across both nodes with vLLM, with predictions recorded before each experiment and scored after.
+Two NVIDIA DGX Spark nodes, connected by a direct 200 GbE ConnectX-7 link and a separate management network, serving LLMs across both nodes with vLLM. This repository contains the setup guide, the validation scripts, the measured data and a full report: [REPORT.md](REPORT.md).
 
-**Read the write-up: [REPORT.md](REPORT.md)**
+![Cluster topology: a laptop and switch on the management network, two DGX Sparks joined by one ConnectX-7 cable](figures/topology.png)
 
-![Two Sparks, one cluster: a laptop and switch on the management network, two DGX Sparks joined by one ConnectX-7 cable](figures/topology.png)
+## What was built
 
-## Findings
+- **Hardware:** 2 x NVIDIA DGX Spark (GB10 Grace Blackwell, 128 GB unified memory at 273 GB/s, sm_121).
+- **Network:** a direct 200 GbE QSFP cable between the two ConnectX-7 ports for inference traffic; a 10 GbE switch and a laptop on a private subnet for management.
+- **Software:** vLLM serving one model across both nodes with Ray and NCCL over RDMA. Pilot runs used a containerized vLLM in eager mode; later runs used native vLLM 0.29.0 on DGX OS 7.6.0.
 
-- **The link reaches 196 Gb/s, but only with both PCIe paths driven at once.** One path caps near 112 Gb/s at any frame size.
-- **Tensor parallelism beats pipeline parallelism across the wire,** 2.01x single-stream and 1.65x at concurrency 32. The prediction said the opposite; transfer volume, not bandwidth ratio, decides it.
-- **A second node helps even when the model fits on one:** 1.57x single-stream throughput and 1.77x faster per-token latency for a 27B model.
-- **Decode is memory-bandwidth bound plus a constant.** 87.7% of the 273 GB/s ceiling, and about 30 ms per forward pass of eager-mode overhead regardless of model or node count.
-- **Throughput claims need a correctness gate.** Every configuration must return correct, uncontaminated answers under load before its numbers count.
+## What was tested
 
-![Tensor parallelism beats pipeline parallelism across the link](figures/tp_vs_pp.png)
+- ConnectX-7 link bandwidth and latency, one PCIe path versus both
+- Tensor parallelism (TP2) versus pipeline parallelism (PP2) across the link
+- One node versus two for a model that fits on one
+- Single-stream decode against the memory-bandwidth ceiling
+- KV-cache capacity at BF16, FP8 and NVFP4
+- A correctness gate under concurrent load, required before any throughput number is counted
 
-## Building it
+Predictions were recorded before each pilot experiment and scored afterward (report section 5).
+
+## Results
+
+| Test | Configuration | Result |
+|---|---|---|
+| Link bandwidth | Both PCIe paths, MTU 9000, `ib_write_bw` | 196.03 Gb/s (98% of line rate) |
+| Link bandwidth | One PCIe path | 111.7 Gb/s |
+| Link latency | `ib_write_lat` | about 1.7 µs |
+| TP2 vs PP2 | Llama 3.3 70B, concurrency 1 | 3.39 vs 1.69 tok/s (2.01x) |
+| TP2 vs PP2 | Llama 3.3 70B, concurrency 32 | 65.3 vs 39.5 tok/s (1.65x) |
+| Two nodes vs one | Qwen3.8 27B, concurrency 1 | 5.71 vs 3.64 tok/s (1.57x); 130 vs 230 ms per token |
+| Decode efficiency | Llama 3.3 70B TP2, concurrency 1 | 87.7% of the 273 GB/s ceiling |
+| Fixed overhead | Pilot, eager mode, all configurations | about 30 ms per forward pass |
+| KV-cache capacity | Qwen3.8 27B, relative to BF16 | NVFP4 weights 1.64x; FP8 KV cache 1.35x |
+| Single-node throughput | Qwen3.8 27B, native stack, concurrency 64 | 120.7 tok/s; ceiling about 191 sequences |
+
+![Tensor parallelism versus pipeline parallelism, Llama 3.3 70B](figures/tp_vs_pp.png)
+
+**Status:** the pilot ran in eager mode. A rerun of the pilot on the compiled native stack is planned; report section 8 lists its predictions, and results will be added there.
+
+## Setup screenshots
 
 NVIDIA's Cluster Assistant configures the ConnectX-7 link: two addresses per node, one per PCIe path, then a link test. Its 185.2 Gbps is the dual-path rate before jumbo frames; with MTU 9000 the link measures 196 Gb/s. Full steps: [docs/SETUP.md](docs/SETUP.md).
 
@@ -36,9 +60,7 @@ NVIDIA's Cluster Assistant configures the ConnectX-7 link: two addresses per nod
 | [`results/`](results/) | Measured data as CSV |
 | [`figures/`](figures/) | Charts, regenerated from `results/` by [`scripts/make_figures.py`](scripts/make_figures.py) |
 
-## Hardware and software
-
-2 x NVIDIA DGX Spark (GB10 Grace Blackwell, 128 GB unified memory, sm_121), one 200 GbE QSFP direct-attach cable, a laptop for control. Native vLLM 0.29.0, PyTorch 2.13, FlashInfer 0.6.18, NCCL 2.29.7, Ray 2.58.0 on DGX OS 7.6.0. Pilot runs used an earlier containerized vLLM; versions are listed in the report.
+Software versions: native vLLM 0.29.0, PyTorch 2.13, FlashInfer 0.6.18, NCCL 2.29.7, Ray 2.58.0 on DGX OS 7.6.0. Pilot versions are listed in the report.
 
 ## License
 
