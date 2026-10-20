@@ -168,7 +168,85 @@ def eager_vs_compiled():
     save(fig, "eager_vs_compiled.png")
 
 
+def _box(ax, x, y, w, h, text, fc="white", ec=GRID, size=10, weight="normal", color=INK, lw=1.2):
+    from matplotlib.patches import FancyBboxPatch
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=0.12",
+                                fc=fc, ec=ec, lw=lw))
+    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=size,
+            weight=weight, color=color, linespacing=1.4)
+
+
+def _canvas(figsize, xlim, ylim):
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
+    ax.axis("off")
+    return fig, ax
+
+
+def topology():
+    fig, ax = _canvas((7, 3.9), (0, 10), (0.3, 5.35))
+    fig.subplots_adjust(top=0.82, left=0.01, right=0.99, bottom=0.01)
+    for x0, y0, x1, y1 in ((5, 4.35, 5, 3.75), (5, 3.15, 1.9, 2.2), (5, 3.15, 8.1, 2.2)):
+        ax.plot([x0, x1], [y0, y1], color=INK2, lw=1.4, solid_capstyle="round")
+    _box(ax, 3.9, 4.35, 2.2, 0.8, "Laptop\ncontrol and benchmarks", size=9)
+    _box(ax, 3.9, 3.15, 2.2, 0.6, "Management switch", size=9)
+    ax.text(6.3, 3.45, "Management network\nSSH, admin, files", fontsize=8.5, color=INK2, va="center",
+            linespacing=1.35)
+    _box(ax, 0.4, 0.75, 3.0, 1.45, "spark1\nGB10, 128 GB unified\n273 GB/s memory", size=9)
+    _box(ax, 6.6, 0.75, 3.0, 1.45, "spark2\nGB10, 128 GB unified\n273 GB/s memory", size=9)
+    for dy in (0.12, -0.12):
+        ax.plot([3.4, 6.6], [1.475 + dy, 1.475 + dy], color=BLUE, lw=2.6, solid_capstyle="butt")
+    ax.text(5.0, 1.82, "ConnectX-7, one 200 GbE cable", ha="center", fontsize=8.5, color=INK, weight="semibold")
+    ax.text(5.0, 1.17, "two PCIe paths, 196 Gb/s\nall cluster traffic", ha="center", va="top",
+            fontsize=8.5, color=INK2, linespacing=1.35)
+    title(fig, "Two networks, two jobs",
+          "Management traffic never shares the cluster link; inference traffic never touches the switch.")
+    save(fig, "topology.png")
+
+
+def parallelism():
+    r = {x["run_id"]: x for x in rows(RES / "pilot" / "runs.csv")}
+    pp, tp = float(r["L-PP-1"]["output_tok_s"]), float(r["L-TP-1"]["output_tok_s"])
+    fig, ax = _canvas((7, 4.4), (0, 10), (0, 6.4))
+    fig.subplots_adjust(top=0.86, left=0.01, right=0.99, bottom=0.01)
+    t1, t2 = (BLUE + "2e"), (AQUA + "2e")
+    # pipeline parallelism
+    ax.text(0.3, 5.75, "Pipeline parallelism: split by depth", fontsize=10, weight="semibold", color=INK)
+    _box(ax, 1.2, 4.1, 2.6, 1.05, "Layers 1 to 40", fc=t1, ec=BLUE, size=9)
+    _box(ax, 1.2, 2.95, 2.6, 1.05, "Layers 41 to 80", fc=t2, ec=AQUA, size=9)
+    ax.text(1.05, 4.62, "spark1", ha="right", va="center", fontsize=9, color=INK2)
+    ax.text(1.05, 3.47, "spark2", ha="right", va="center", fontsize=9, color=INK2)
+    ax.annotate("", xy=(4.2, 2.95), xytext=(4.2, 5.15), arrowprops=dict(arrowstyle="-|>", color=INK2, lw=1.2))
+    ax.text(4.32, 4.05, "then", fontsize=8.5, color=INK2, va="center", style="italic")
+    ax.text(2.5, 2.55, "Half the weights per node,\nread one stage after the other", ha="center", va="top",
+            fontsize=8.5, color=INK2, linespacing=1.35)
+    ax.text(2.5, 1.2, f"{pp:.2f} tok/s", ha="center", fontsize=17, weight="semibold", color=INK)
+    ax.text(2.5, 0.75, "Llama 3.3 70B, one stream", ha="center", fontsize=8.5, color=INK2)
+    # tensor parallelism
+    ax.text(5.3, 5.75, "Tensor parallelism: split every layer", fontsize=10, weight="semibold", color=INK)
+    ax.text(6.95, 5.3, "spark1", ha="center", fontsize=9, color=INK2)
+    ax.text(8.45, 5.3, "spark2", ha="center", fontsize=9, color=INK2)
+    for i, lab in enumerate(["Layer 1", "Layer 2", "Layer 3", "Layer 80"]):
+        y = 4.6 - i * 0.55 - (0.25 if i == 3 else 0)
+        _box(ax, 6.2, y, 1.48, 0.45, "", fc=t1, ec=BLUE, lw=1)
+        _box(ax, 7.72, y, 1.48, 0.45, "", fc=t2, ec=AQUA, lw=1)
+        ax.annotate("", xy=(7.45, y + 0.225), xytext=(7.95, y + 0.225),
+                    arrowprops=dict(arrowstyle="<|-|>", color=INK2, lw=0.9, mutation_scale=8))
+        ax.text(6.05, y + 0.225, lab, ha="right", va="center", fontsize=8.5, color=INK2)
+    ax.text(7.7, 3.34, "· · ·", ha="center", va="center", fontsize=10, color=INK2)
+    ax.text(7.7, 2.55, "Half of every layer per node,\nboth read at the same time", ha="center", va="top",
+            fontsize=8.5, color=INK2, linespacing=1.35)
+    ax.text(7.7, 1.2, f"{tp:.2f} tok/s", ha="center", fontsize=17, weight="semibold", color=INK)
+    ax.text(7.7, 0.75, "same model, same hardware", ha="center", fontsize=8.5, color=INK2)
+    title(fig, "Two ways to split a model across two nodes",
+          "Decode speed is set by how many weight bytes each node streams per token, and when.")
+    save(fig, "parallelism.png")
+
+
 if __name__ == "__main__":
+    topology()
+    parallelism()
     interconnect()
     paired_panels("tp_vs_pp.png", ["L-TP", "L-PP"], ["TP2", "PP2"], [BLUE, AQUA],
                   "Tensor parallelism beats pipeline parallelism across the link",

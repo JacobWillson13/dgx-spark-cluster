@@ -84,7 +84,13 @@ roceP2p1s0f1 port 1 ==> enP2p1s0f1np1 (Up)
 
 Each physical port appears as **two interfaces, one per PCIe path**. `enp1s0f1np1` and `enP2p1s0f1np1` are the same wire. Ethernet tools take the interface name; RDMA tools take the left-hand device name.
 
-Add both Sparks to NVIDIA Sync on the laptop, then run **Cluster Assistant → Add New Cluster**. It checks usernames and UIDs, assigns two addresses per node (one per PCIe path, on separate `/24` subnets), exchanges SSH keys between the nodes and runs a link test. Record the four addresses it assigns in the variables above.
+Add both Sparks to NVIDIA Sync on the laptop, then run **Cluster Assistant → Add New Cluster**. It checks that usernames, UIDs and GIDs match:
+
+![Cluster Assistant verifying user details (username redacted)](../figures/screenshots/cluster-assistant-users.png)
+
+It then assigns two addresses per node, one per PCIe path on separate `/24` subnets, exchanges SSH keys between the nodes and runs a link test. Record the four addresses it assigns in the variables above.
+
+![Cluster Assistant network configuration: two addresses per node (redacted)](../figures/screenshots/cluster-assistant-network.png)
 
 ## 4. Jumbo frames
 

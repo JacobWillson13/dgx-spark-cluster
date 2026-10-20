@@ -35,6 +35,8 @@ Two networks with separate jobs:
 
 Keeping them apart means an administrative session cannot disturb a benchmark, and a benchmark cannot lock an operator out.
 
+![Two networks, two jobs](figures/topology.png)
+
 ## 3. Interconnect
 
 The ConnectX-7 adapter presents each physical port as two logical interfaces, one per PCIe path into the SoC (`enp1s0f1np1` and `enP2p1s0f1np1`). With one cable installed, both are views of the same wire. A benchmark that drives one interface measures one PCIe path, and one path cannot saturate a 200 GbE port.
@@ -55,6 +57,8 @@ RoCE derives its path MTU from the interface MTU: 1500 gives 1024, and 9000 give
 
 NVIDIA's Cluster Assistant reported 185.2 Gb/s in its own link test. That matches the dual-path measurement at path MTU 1024 to within noise; the test ran before the MTU change.
 
+![Cluster Assistant link test: 185.2 Gbps, 1.7 µs](figures/screenshots/cluster-assistant-link-test.png)
+
 Latency carries one warning. `ping` reports 1.1 to 2.0 ms across this link because ICMP goes through the kernel network stack. RDMA bypasses it and measures 1.7 µs. Anyone validating this link with `ping` will conclude it is broken.
 
 ## 4. Method
@@ -67,6 +71,8 @@ Each Spark has one GPU, so every multi-node configuration is a two-way split acr
 - **Pipeline parallelism (PP2):** splits by depth, so a token passes through node one, then node two.
 
 Ray coordinates multi-node serving; vLLM's multiprocess backend cannot span hosts.
+
+![Two ways to split a model across two nodes](figures/parallelism.png)
 
 ### 4.2 What the benchmark sends
 

@@ -4,6 +4,8 @@ What a second NVIDIA DGX Spark actually buys for LLM inference, measured. Two GB
 
 **Read the write-up: [REPORT.md](REPORT.md)**
 
+![Two networks, two jobs](figures/topology.png)
+
 ## Findings
 
 - **The link reaches 196 Gb/s, but only with both PCIe paths driven at once.** One path caps near 112 Gb/s at any frame size.
