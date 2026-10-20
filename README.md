@@ -16,6 +16,15 @@ What a second NVIDIA DGX Spark actually buys for LLM inference, measured. Two GB
 
 ![Tensor parallelism beats pipeline parallelism across the link](figures/tp_vs_pp.png)
 
+## Building it
+
+NVIDIA's Cluster Assistant configures the ConnectX-7 link: two addresses per node, one per PCIe path, then a link test. Its 185.2 Gbps is the dual-path rate before jumbo frames; with MTU 9000 the link measures 196 Gb/s. Full steps: [docs/SETUP.md](docs/SETUP.md).
+
+<p>
+  <img src="figures/screenshots/cluster-assistant-network.png" width="49%" alt="Cluster Assistant network configuration, two addresses per node (redacted)">
+  <img src="figures/screenshots/cluster-assistant-link-test.png" width="49%" alt="Cluster Assistant link test: 185.2 Gbps, 1.7 µs">
+</p>
+
 ## Repository
 
 | Path | Contents |
