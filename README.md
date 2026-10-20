@@ -37,7 +37,8 @@ Predictions were recorded before each pilot experiment and scored afterward (rep
 | Single-node throughput | Qwen3.8 27B, native stack, concurrency 64 | 120.7 tok/s; ceiling about 191 sequences |
 | Eager vs compiled | Qwen3.8 27B one node, concurrency 1 | 230 vs 210 ms per token; constant 29 to 9 ms |
 | Eager vs compiled | Llama 3.3 70B TP2, concurrency 1 | 289 vs 290 ms per token; constant unchanged |
-| GSM8K by precision | Qwen3.8 27B, 200 items | BF16 67.5%, FP8 70.5%, NVFP4 62.0% |
+| GSM8K by precision | Qwen3.8 27B, all 1,319 items | BF16 73.1%, FP8 71.3%, NVFP4 59.4% |
+| Cross-node all-reduce | 16 KB message, inside a CUDA graph | about 55 µs |
 
 ![Tensor parallelism versus pipeline parallelism, Llama 3.3 70B](figures/tp_vs_pp.png)
 

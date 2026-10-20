@@ -1,2 +1,48 @@
 run_id,outcome,stop_reason,failure_line,minutes_to_stop,g0,c1_output_tok_s,c1_median_tpot_ms
 C-DEEPSEEK,STOCK_FAILURE,Stock T2 recipe rejected default KV cache dtype before weight loading; one attempt exhausted,"AssertionError: DeepseekV4 fp8_ds_mla layout only supports fp8 kv-cache, got auto",0.6306971117999638,NOT_RUN,,
+C-DEEPSEEK-2,STOP,"ray-status: exit 1: ======== Autoscaler status: 2026-10-20 14:00:00.034492 ========
+Node status
+---------------------------------------------------------------
+Active:
+ 1 node_ebe746fef3973ca218cdefe045917882c3ab98eee6054321e10b5c34
+Pending:
+ (no pending nodes)
+Recent failures:
+ (no failures)
+
+Resources
+---------------------------------------------------------------
+Total Usage:
+ 0.0/20.0 CPU
+ 0.0/1.0 GPU
+ 0B/80.67GiB memory
+ 0B/34.57GiB object_store_memory
+
+From request_resources:
+ (none)
+Pending Demands:
+ (no resource demands)
+","ray-status: exit 1: ======== Autoscaler status: 2026-10-20 14:00:00.034492 ========
+Node status
+---------------------------------------------------------------
+Active:
+ 1 node_ebe746fef3973ca218cdefe045917882c3ab98eee6054321e10b5c34
+Pending:
+ (no pending nodes)
+Recent failures:
+ (no failures)
+
+Resources
+---------------------------------------------------------------
+Total Usage:
+ 0.0/20.0 CPU
+ 0.0/1.0 GPU
+ 0B/80.67GiB memory
+ 0B/34.57GiB object_store_memory
+
+From request_resources:
+ (none)
+Pending Demands:
+ (no resource demands)
+",0.0,NOT_RUN,,
+C-DEEPSEEK-2-R2,STOCK_STOP,first listed stock-attempt stop condition,"cold JIT compile starting: spark1: COLD_COMPILER  405231  405230 nvcc            /usr/local/cuda/bin/nvcc ~/.cache/vllm/deep_gemm/tmp/399467-2b7541c7-4712e636-158ae796/kernel.cu -cubin -o ~/.cache/vllm/deep_gemm/tmp/399467-2b7541c7-4712e636-158ae796/kernel.cubin -std c++20 --diag-suppress 39,161,174,177,186,940 --ptxas-options --register-usage-level=10 -I~/venvs/vllm029/lib/python3.12/site-packages/vllm/third_party/deep_gemm/include -gencode arch=compute_120f,code=sm_120f --compiler-options -fPIC,-O3,-fconcepts,-Wno-deprecated-declarations,-Wno-abi -O3 --expt-relaxed-constexpr --expt-extended-lambda",0.9441673278808593,NOT_RUN,,

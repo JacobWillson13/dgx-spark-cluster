@@ -1,0 +1,5 @@
+baseline,candidate,filter,n_paired,diff_points,ci95_low,ci95_high,baseline_only_right,candidate_only_right,mcnemar_p
+C-QUALITY-BF16-FULL,C-QUALITY-NVFP4-FULL,flexible-extract,1319,-13.65,-16.19,-11.1,249,69,0.0
+C-QUALITY-BF16-FULL,C-QUALITY-NVFP4-FULL,strict-match,1319,-14.71,-17.18,-12.23,250,56,0.0
+C-QUALITY-BF16-FULL,C-QUALITY-FP8-FULL,flexible-extract,1319,-1.82,-3.46,-0.18,73,49,0.0369
+C-QUALITY-BF16-FULL,C-QUALITY-FP8-FULL,strict-match,1319,-1.59,-3.13,-0.06,64,43,0.0527
