@@ -184,24 +184,90 @@ def _canvas(figsize, xlim, ylim):
     return fig, ax
 
 
+def _place(ax, name, cx, y0, width, z=3):
+    """Draw figures/assets/<name> centred at cx with its base at y0, keeping its aspect ratio."""
+    img = plt.imread(OUT / "assets" / name)
+    h = width * img.shape[0] / img.shape[1]
+    ax.imshow(img, extent=(cx - width / 2, cx + width / 2, y0, y0 + h), zorder=z, interpolation="lanczos")
+    return cx - width / 2, cx + width / 2, y0, y0 + h
+
+
 def topology():
-    fig, ax = _canvas((7, 3.9), (0, 10), (0.3, 5.35))
-    fig.subplots_adjust(top=0.82, left=0.01, right=0.99, bottom=0.01)
-    for x0, y0, x1, y1 in ((5, 4.35, 5, 3.75), (5, 3.15, 1.9, 2.2), (5, 3.15, 8.1, 2.2)):
-        ax.plot([x0, x1], [y0, y1], color=INK2, lw=1.4, solid_capstyle="round")
-    _box(ax, 3.9, 4.35, 2.2, 0.8, "Laptop\ncontrol and benchmarks", size=9)
-    _box(ax, 3.9, 3.15, 2.2, 0.6, "Management switch", size=9)
-    ax.text(6.3, 3.45, "Management network\nSSH, admin, files", fontsize=8.5, color=INK2, va="center",
-            linespacing=1.35)
-    _box(ax, 0.4, 0.75, 3.0, 1.45, "spark1\nGB10, 128 GB unified\n273 GB/s memory", size=9)
-    _box(ax, 6.6, 0.75, 3.0, 1.45, "spark2\nGB10, 128 GB unified\n273 GB/s memory", size=9)
-    for dy in (0.12, -0.12):
-        ax.plot([3.4, 6.6], [1.475 + dy, 1.475 + dy], color=BLUE, lw=2.6, solid_capstyle="butt")
-    ax.text(5.0, 1.82, "ConnectX-7, one 200 GbE cable", ha="center", fontsize=8.5, color=INK, weight="semibold")
-    ax.text(5.0, 1.17, "two PCIe paths, 196 Gb/s\nall cluster traffic", ha="center", va="top",
-            fontsize=8.5, color=INK2, linespacing=1.35)
-    title(fig, "Two networks, two jobs",
-          "Management traffic never shares the cluster link; inference traffic never touches the switch.")
+    from matplotlib.patches import Ellipse, FancyBboxPatch
+    W, H = 9.0, 4.8
+    fig = plt.figure(figsize=(W, H))
+    ax = fig.add_axes((0, 0, 1, 1))
+    ax.axis("off")
+    line = dict(color=INK2, lw=1.3, solid_capstyle="round", zorder=1)
+
+    # devices
+    lap = _place(ax, "laptop.png", 2.6, 2.86, 1.75)
+    sw = _place(ax, "switch.png", 2.6, 2.06, 1.0)
+    s1 = _place(ax, "dgx-spark.png", 1.0, 0.74, 1.5)
+    s2 = _place(ax, "dgx-spark.png", 4.2, 0.74, 1.5)
+    for s in (s1, s2):
+        ax.add_patch(Ellipse(((s[0] + s[1]) / 2, s[2] + 0.01), 1.45, 0.07, color=INK, alpha=0.10, lw=0, zorder=2))
+
+    # management network: laptop to switch, switch to both nodes
+    bus = 1.78
+    ax.plot([2.6, 2.6], [lap[2] + 0.02, sw[3] - 0.02], **line)
+    ax.plot([2.6, 2.6], [sw[2] + 0.02, bus], **line)
+    ax.plot([1.0, 4.2], [bus, bus], **line)
+    for cx, top in ((1.0, s1[3]), (4.2, s2[3])):
+        ax.plot([cx, cx], [bus, top - 0.04], **line)
+
+    # cluster link: one cable, two PCIe paths
+    cy = 1.02
+    for dy in (0.045, -0.045):
+        ax.plot([s1[1] - 0.04, s2[0] + 0.04], [cy + dy, cy + dy], color=BLUE, lw=2.4,
+                solid_capstyle="butt", zorder=2)
+    ax.text(2.6, cy + 0.17, "ConnectX-7, 200 GbE", ha="center", va="bottom", fontsize=10,
+            weight="semibold", color=BLUE)
+    ax.text(2.6, cy - 0.15, "two PCIe paths\n196 Gb/s combined", ha="center", va="top", fontsize=9,
+            color=INK2, linespacing=1.3)
+
+    # device labels
+    lx = 3.62
+    ax.text(lx, (lap[2] + lap[3]) / 2 + 0.1, "Laptop", fontsize=10.5, weight="semibold", color=INK, va="bottom")
+    ax.text(lx, (lap[2] + lap[3]) / 2 + 0.06, "control, SSH, benchmarks", fontsize=9.5, color=INK2, va="top")
+    ax.text(lx, (sw[2] + sw[3]) / 2 + 0.06, "Management switch", fontsize=10.5, weight="semibold", color=INK,
+            va="bottom")
+    ax.text(lx, (sw[2] + sw[3]) / 2 + 0.02, "10 GbE, admin and files", fontsize=9.5, color=INK2, va="top")
+    for s, name, role in ((s1, "spark1", "Ray head, serves the API"), (s2, "spark2", "Ray worker")):
+        cx = (s[0] + s[1]) / 2
+        ax.text(cx, s[2] - 0.1, name, ha="center", va="top", fontsize=10.5, weight="semibold", color=INK)
+        ax.text(cx, s[2] - 0.34, role, ha="center", va="top", fontsize=9.5, color=INK2)
+
+    # hardware panel
+    px, pw = 5.5, 3.3
+    ax.add_patch(FancyBboxPatch((px, 0.16), pw, 3.78, boxstyle="round,pad=0,rounding_size=0.1",
+                                fc="#f3f2ee", ec="none", zorder=0))
+    ax.text(px + 0.25, 3.68, "The hardware", fontsize=11.5, weight="semibold", color=INK, va="top")
+    spec = [
+        ("Nodes", "2 x NVIDIA DGX Spark"),
+        ("Chip", "GB10 Grace Blackwell"),
+        ("Memory", "128 GB unified, 273 GB/s"),
+        ("Usable", "about 121 GiB per node"),
+        ("Cluster link", "ConnectX-7, 200 GbE cable"),
+        ("Management", "10 GbE through a switch"),
+        ("Software", "DGX OS 7.6, vLLM 0.29.0"),
+    ]
+    for i, (k, v) in enumerate(spec):
+        y = 3.2 - i * 0.33
+        ax.text(px + 0.25, y, k, fontsize=9.5, weight="semibold", color=INK, va="center")
+        ax.text(px + 1.28, y, v, fontsize=9.5, color=INK2, va="center")
+        if i:
+            ax.plot([px + 0.25, px + pw - 0.25], [y + 0.165, y + 0.165], color=GRID, lw=0.8, zorder=1)
+    ax.plot([px + 0.27, px + 0.27], [0.4, 0.92], color=BLUE, lw=2.4, solid_capstyle="butt", zorder=2)
+    ax.text(px + 0.42, 0.66, "CPU and GPU share one memory pool, so\n"
+            "running out stalls the whole node. Every\nlaunch runs under a memory watchdog.",
+            fontsize=8.8, color=INK2, va="center", linespacing=1.4, zorder=3)
+
+    ax.text(0.25, H - 0.22, "Two Sparks, one cluster", fontsize=16, weight="semibold", color=INK, va="top")
+    ax.text(0.25, H - 0.6, "Two networks with separate jobs: the switch carries management, "
+            "the cable carries every byte of inference traffic.", fontsize=10, color=INK2, va="top")
+    ax.set_xlim(0, W)
+    ax.set_ylim(0, H)
     save(fig, "topology.png")
 
 

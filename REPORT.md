@@ -35,7 +35,7 @@ Two networks with separate jobs:
 
 Keeping them apart means an administrative session cannot disturb a benchmark, and a benchmark cannot lock an operator out.
 
-![Two networks, two jobs](figures/topology.png)
+![Two Sparks, one cluster: a laptop and switch on the management network, two DGX Sparks joined by one ConnectX-7 cable](figures/topology.png)
 
 ## 3. Interconnect
 

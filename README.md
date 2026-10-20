@@ -4,7 +4,7 @@ What a second NVIDIA DGX Spark actually buys for LLM inference, measured. Two GB
 
 **Read the write-up: [REPORT.md](REPORT.md)**
 
-![Two networks, two jobs](figures/topology.png)
+![Two Sparks, one cluster: a laptop and switch on the management network, two DGX Sparks joined by one ConnectX-7 cable](figures/topology.png)
 
 ## Findings
 
@@ -42,6 +42,6 @@ NVIDIA's Cluster Assistant configures the ConnectX-7 link: two addresses per nod
 
 ## License
 
-Code is under the [MIT License](LICENSE). The report, documentation and figures are under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Code is under the [MIT License](LICENSE). The report, documentation and figures are under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The product images in `figures/assets/` are manufacturer photos used for illustration and are not covered by either license.
 
 Jacob Willson
