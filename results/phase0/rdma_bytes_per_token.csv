@@ -1,0 +1,5 @@
+node,rail,tx_bytes_per_token,rx_bytes_per_token
+spark1,rail A,3307128,3307135
+spark1,rail B,370656,370648
+spark2,rail A,3307135,3307128
+spark2,rail B,370648,370656

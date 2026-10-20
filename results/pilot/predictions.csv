@@ -1,0 +1,5 @@
+prediction,outcome,evidence
+Single-stream decode lands at 80-90% of the memory-bandwidth ceiling,Confirmed,Llama 87.7% (TP2) and 87.3% (PP2)
+DeepSeek V4 Flash decodes substantially faster than Llama 3.3 70B,Not tested,deepseek_v4 unsupported by the pilot stack
+Pipeline parallelism outperforms tensor parallelism across the link,Falsified,TP2 2.01x single-stream and 1.65x at concurrency 32
+A second node helps aggregate throughput but not single-stream latency,Falsified,Qwen 27B single-stream improved 1.57x

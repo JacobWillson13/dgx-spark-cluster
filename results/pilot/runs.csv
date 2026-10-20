@@ -1,0 +1,9 @@
+run_id,model,config,nodes,concurrency,num_prompts,output_tok_s,median_ttft_ms,median_tpot_ms,p99_itl_ms
+L-TP-1,Llama-3.3-70B-Instruct,TP2,2,1,5,3.39,1337,289.2,358
+L-TP-32,Llama-3.3-70B-Instruct,TP2,2,32,64,65.31,9709,457.0,2431
+L-PP-1,Llama-3.3-70B-Instruct,PP2,2,1,5,1.69,2212,581.9,645
+L-PP-32,Llama-3.3-70B-Instruct,PP2,2,32,64,39.48,10796,783.9,4064
+Q-1N-1,Qwen3.8-27B,single node,1,1,5,3.64,1101,230.1,245
+Q-1N-32,Qwen3.8-27B,single node,1,32,64,72.69,5917,400.9,1975
+Q-2N-1,Qwen3.8-27B,TP2,2,1,5,5.71,817,130.4,148
+Q-2N-32,Qwen3.8-27B,TP2,2,32,64,120.34,3856,245.2,1286

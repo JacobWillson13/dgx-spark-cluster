@@ -1,0 +1,5 @@
+qwen_weights,kv_cache_dtype,resident_weights_gib,kv_cache_gib_at_0_85,gpu_kv_tokens,linear_kernel
+BF16,auto (BF16),51.1,47.98,482846,BF16
+FP8,auto,28.51,69.51,699693,CutlassFp8BlockScaledMMKernel
+NVFP4,auto,19.95,78.51,790287,FlashInferCutlassNvFp4LinearKernel
+BF16,fp8,51.1,,652629,BF16

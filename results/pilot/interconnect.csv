@@ -1,0 +1,5 @@
+configuration,path_mtu_bytes,per_path_gbps,aggregate_gbps,pct_of_line_rate
+single path,1024,111.72,111.72,55.9
+dual path,1024,92.57,185.14,92.6
+single path,4096,111.73,111.73,55.9
+dual path,4096,98.015,196.03,98.0

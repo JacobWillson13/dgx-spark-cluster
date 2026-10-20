@@ -1,0 +1,12 @@
+measurement,value,unit,configuration,notes
+Weight load time fastsafetensors,6.90,s,Qwen3.8-27B BF16,weights only; 11.0 s total model load
+Weight load time default loader,302.9-389.5,s,Qwen3.8-27B BF16,range across launches; 44x slower
+CUDA graph compile time,15-17,s,Qwen3.8-27B BF16 max-num-seqs 64,pilot compiled run took over 37 min in a different stack
+NVFP4 KV capacity vs BF16,1.64,ratio,Qwen3.8-27B at 0.85 memory fraction,790287 / 482846 tokens
+FP8 KV cache capacity vs BF16 KV,1.35,ratio,Qwen3.8-27B BF16 weights,652629 / 482846 tokens; Mamba state stays float32
+Harness agreement,0.0573,percent,Qwen BF16 C64 identical inputs,vLLM bench serve 118.9803 vs AIPerf 118.9121 output tok/s
+Output throughput at C64 (window mean),120.73,tok/s,Qwen BF16 single node 1024/256,accepted measurement; 320 requests; 0 errors
+Concurrency ceiling (running sequences),191,sequences,Qwen BF16 single node max-num-seqs 256,modal; mean 190.7; max 195; bound by KV blocks at ~98.6%
+Output throughput at ceiling (diagnostic),142.40,tok/s,Qwen BF16 single node ~191 running,not an accepted headline; 62 client timeouts above the ceiling
+TP2 interconnect traffic,3.68,MB per output token,Qwen BF16 TP2 one way per node,mlx5 RDMA counters; both rails active
+Hardware burn (fp16 8192^3 matmul),87.9-95.3,TFLOP/s,per node,pass threshold 88

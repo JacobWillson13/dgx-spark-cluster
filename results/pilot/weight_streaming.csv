@@ -1,0 +1,5 @@
+config,model,predicted_memory_ms,measured_median_tpot_ms,residual_ms,sequential_passes
+Qwen 27B single node,Qwen3.8-27B,201.0,230.1,29.1,1
+Qwen 27B TP2,Qwen3.8-27B,101.0,130.4,29.4,1
+Llama 70B TP2,Llama-3.3-70B-Instruct,259.0,289.2,30.2,1
+Llama 70B PP2,Llama-3.3-70B-Instruct,517.2,581.9,64.7,2
