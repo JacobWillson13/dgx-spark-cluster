@@ -1,0 +1,5 @@
+workload,topology,concurrency,input_tok_s,output_tok_s,median_input_tokens,median_output_tokens,median_ttft_s,median_request_s,source
+random,1N,16,229.8,57.461,1024,256,5.05,72.7,sweep.csv row 1N/16; input = 4 x output (every request 1024 in / 256 out); request time = TTFT + 255 x median TPOT
+random,TP2,16,403.2,100.791,1024,256,3.05,41.6,sweep.csv row TP2/16; same derivation
+govreport,1N,16,578.6,26.88,8923.5,417,14.49,247.3,GovReport-1N summary.json and requests.jsonl (medians over 100 reports)
+govreport,TP2,16,1031.69,48.05,8923.5,442.5,7.32,139.6,GovReport-TP2 summary.json and requests.jsonl (medians over 100 reports)

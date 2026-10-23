@@ -525,6 +525,126 @@ def banner(name="banner.png", size=(12, 3.2), social=False):
     save(fig, name)
 
 
+def prompts():
+    """The five prompt types: what was sent, what came back, and how it was judged."""
+    from matplotlib.patches import FancyBboxPatch, Circle
+    mono = "DejaVu Sans Mono"
+    W, H = 120, 92
+    fig = plt.figure(figsize=(12, 8.8))
+    ax = fig.add_axes([0, 0, 1, 1]); ax.axis("off"); ax.set_xlim(0, W); ax.set_ylim(4, H)
+    X_NAME, X_P, W_P, X_A, W_A, X_J, X_R = 2.5, 19, 30, 54, 21, 78.5, 99.5
+    LH = 2.15  # line height in axis units
+
+    def card(x, y, w, h, fc, ec, lw):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=0.8", fc=fc, ec=ec, lw=lw))
+
+    def check(x, y, color):
+        ax.add_patch(Circle((x, y), 1.15, fc=color, ec="none"))
+        ax.plot([x - 0.55, x - 0.1, x + 0.62], [y, y - 0.45, y + 0.5], color="white", lw=2, solid_capstyle="round")
+
+    ax.text(X_NAME, 89, "Five kinds of prompts, two jobs", fontsize=17, weight="semibold", color=INK, va="center")
+    ax.text(X_NAME, 85.6, "The correctness gate runs on every server launch. A speed or quality number counts only after it passes.",
+            fontsize=10.5, color=INK2, va="center")
+    for x, label in [(X_P, "PROMPT SENT"), (X_A, "WHAT CAME BACK"), (X_J, "JUDGED BY"), (X_R, "RESULT")]:
+        ax.text(x, 81.6, label, fontsize=8, color=INK2, weight="semibold", va="center")
+
+    rows = [
+        ("gate", "Smoke pair", "Is the model sane?",
+         ['"The capital of France is"', '"What is 17 times 23?', ' Answer with the number only."'], "two short prompts",
+         ['Paris.', 'The capital of Germany is', 'Berlin. ...', '391'],
+         'first answer contains "Paris";\nsecond answer is 391', "Pass", "every launch"),
+        ("gate", "Echo", "Does each request get\nits own answer back?",
+         ['"Repeat this number exactly,', ' and nothing else: 240891"'], "256 at once, each with a different number",
+         ['240891'], "its own number, and no\nother request's number", "4,096", "of 4,096 owned, 256 at a time"),
+        ("work", "Random tokens", "How fast is it?",
+         ['"ptic ,)) endum theless', ' orbit ic ..."'], "1,024 random tokens in, 256 forced out",
+         ['(256 tokens, unread)'], "not graded; only timed", "324", "tok/s peak on TP2\n(170 on one node)"),
+        ("work", "GSM8K", "Does lower precision\nhurt reasoning?",
+         ['"Janet\'s ducks lay 16 eggs per', ' day. ... How much in dollars', ' does she make every day?"'],
+         "1,319 problems, 5 solved examples first",
+         ['16 - 3 - 4 = 9 eggs', '9 * 2 = $18', '#### 18'], "final number matches the\nreference answer",
+         "73.1%", "BF16; FP8 71.3%, NVFP4 59.4%"),
+        ("work", "GovReport", "Real documents: how\nmany per hour?",
+         ['"Summarize the following government', ' report for a decision maker. Use', ' exactly three sections ..."',
+          ' + the report itself'], "GAO and CRS reports, median 8,900 tokens",
+         ['Why this study was done', 'What was found', 'What is recommended'],
+         "word overlap with the\nexpert-written summary\n(ROUGE-L 22.0)", "384", "reports per hour on TP2\n(215 on one node)"),
+    ]
+    y = 78.5
+    band_seen = None
+    for band, name, purpose, prompt, size, answer, judged, big, small in rows:
+        color = AQUA if band == "gate" else BLUE
+        if band != band_seen:
+            band_seen = band
+            y -= 0.6
+            ax.plot([X_NAME, W - 2], [y, y], color=color, lw=2)
+            ax.text(X_NAME, y - 1.7, "CORRECTNESS GATE  (every launch)" if band == "gate"
+                    else "MEASURED WORKLOADS  (timed and scored)", fontsize=8.5, weight="semibold", color=color, va="center")
+            y -= 3.6
+        n = max(len(prompt) + 1.3, len(answer), 3)
+        h = n * LH + 1.6
+        top = y
+        ax.text(X_NAME, top - 1.2, name, fontsize=12, weight="semibold", color=INK, va="top")
+        ax.text(X_NAME, top - 4.0, purpose, fontsize=8.8, color=INK2, va="top", linespacing=1.3)
+        card(X_P, top - h, W_P, h, "white", color, 1.2)
+        ax.text(X_P + 1.2, top - 1.0, "\n".join(prompt), fontsize=8.6, family=mono, color=INK, va="top", linespacing=1.5)
+        ax.text(X_P + 1.2, top - h + 1.0, size, fontsize=7.8, color=INK2, va="bottom")
+        ax.annotate("", (X_A - 0.6, top - h / 2), (X_P + W_P + 0.6, top - h / 2),
+                    arrowprops=dict(arrowstyle="-|>", color=color, lw=1.3, shrinkA=0, shrinkB=0))
+        card(X_A, top - h, W_A, h, "#f1f0ec", "none", 0)
+        ax.text(X_A + 1.2, top - 1.0, "\n".join(answer), fontsize=8.6, family=mono, color=INK, va="top", linespacing=1.5)
+        ax.text(X_J, top - 1.2, judged, fontsize=8.8, color=INK, va="top", linespacing=1.35)
+        if big == "Pass":
+            check(X_R + 1.2, top - 2.6, color)
+            ax.text(X_R + 3.3, top - 2.6, "Pass", fontsize=17, weight="semibold", color=INK, va="center")
+        else:
+            ax.text(X_R, top - 2.6, big, fontsize=18, weight="semibold", color=INK, va="center")
+        ax.text(X_R, top - 5.2, small, fontsize=8.4, color=INK2, va="top", linespacing=1.3)
+        y = top - h - 2.2
+    ax.text(X_NAME, y + 0.4, "Grey boxes: the model's real outputs from the run logs (Qwen3.8 27B BF16). For GSM8K and GovReport they show "
+            "the dataset's reference solution and the required headings.", fontsize=7.8, color=INK2)
+    save(fig, "prompts.png")
+
+
+def prompt_speed():
+    path = RES / "sweep" / "prompt_speed.csv"
+    if not path.exists():
+        print("skip prompt_speed.png (no results/sweep/prompt_speed.csv yet)")
+        return
+    r = {(x["workload"], x["topology"]): x for x in rows(path)}
+    order = [("random", "1N", "Random, one node"), ("random", "TP2", "Random, TP2"),
+             ("govreport", "1N", "GovReport, one node"), ("govreport", "TP2", "GovReport, TP2")]
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11, 4.2), sharey=True)
+    fig.subplots_adjust(top=0.70, left=0.155, right=0.97, bottom=0.14, wspace=0.12)
+    ys = [3.2, 2.2, 1.0, 0.0]
+    for ax in (a1, a2):
+        ax.grid(axis="x"); ax.grid(axis="y", visible=False)
+    for y, (w, t, label) in zip(ys, order):
+        x = r[(w, t)]
+        inp, out = float(x["input_tok_s"]), float(x["output_tok_s"])
+        a1.barh(y, inp, 0.62, color=AQUA)
+        a1.barh(y, out, 0.62, left=inp, color=BLUE)
+        a1.text(inp + out + 18, y, f"{inp + out:,.0f}  ({out:.0f} written)", va="center", fontsize=8.5, color=INK)
+        ttft, total = float(x["median_ttft_s"]), float(x["median_request_s"])
+        tpot = (total - ttft) / max(float(x["median_output_tokens"]) - 1, 1) * 1000
+        a2.barh(y, ttft, 0.62, color=AQUA)
+        a2.barh(y, total - ttft, 0.62, left=ttft, color=BLUE)
+        a2.text(total + 4, y, f"{total:.0f} s  ({tpot:.0f} ms per token)", va="center", fontsize=8.5, color=INK)
+    a1.set_yticks(ys, [o[2] for o in order])
+    a1.tick_params(axis="y", labelsize=9.5)
+    a1.set_xlim(0, 1500); a2.set_xlim(0, 420)
+    a1.set_xlabel("Tokens per second, all 16 users together")
+    a2.set_xlabel("Median seconds for one request")
+    from matplotlib.patches import Patch
+    a1.legend(handles=[Patch(color=AQUA, label="Read (prompt)"), Patch(color=BLUE, label="Written (answer)")],
+              loc="lower left", bbox_to_anchor=(0, 1.0), ncol=2, frameon=False, fontsize=9, handlelength=1.0)
+    a2.legend(handles=[Patch(color=AQUA, label="Waiting for the first token"), Patch(color=BLUE, label="Writing the answer")],
+              loc="lower left", bbox_to_anchor=(0, 1.0), ncol=2, frameon=False, fontsize=9, handlelength=1.0)
+    title(fig, "Long documents move twice the tokens, almost all of it reading",
+          "16 users at once, Qwen3.8-27B BF16. Random prompts: 1,024 tokens in, 256 out. GovReport: median 8,924 in, about 430 out.\n"
+          "Writing still takes most of each request: every new token is slower with 9,000 tokens of context behind it.")
+    save(fig, "prompt_speed.png")
+
 if __name__ == "__main__":
     topology()
     parallelism()
@@ -543,5 +663,7 @@ if __name__ == "__main__":
     overhead()
     scaling()
     scorecard()
+    prompts()
+    prompt_speed()
     banner(size=(12, 1.7))
     banner("social-preview.png", (12.8, 6.4), social=True)
