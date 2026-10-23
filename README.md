@@ -1,10 +1,10 @@
 # Multi-Node LLM Inference on Two NVIDIA DGX Sparks
 
-![Cluster topology: a laptop and switch on the management network, two DGX Sparks joined by one ConnectX-7 cable](figures/topology.png)
-
 [![checks](https://github.com/JacobWillson13/dgx-spark-cluster/actions/workflows/ci.yml/badge.svg)](https://github.com/JacobWillson13/dgx-spark-cluster/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/code-MIT-2a78d6.svg)](LICENSE)
 [![Docs: CC BY 4.0](https://img.shields.io/badge/docs-CC%20BY%204.0-1baf7a.svg)](https://creativecommons.org/licenses/by/4.0/)
+
+![Cluster topology: a laptop and switch on the management network, two DGX Sparks joined by one ConnectX-7 cable](figures/topology.png)
 
 Two NVIDIA DGX Sparks joined by one 200 GbE cable and run as a single vLLM inference cluster. What was measured: how fast the link is, how to split a model across the two nodes, when the second node is worth having, and what lower precision costs in accuracy. Every throughput number passed a correctness gate first, and every prediction was recorded before its run. The full write-up is [REPORT.md](REPORT.md).
 
