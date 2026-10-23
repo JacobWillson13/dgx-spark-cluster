@@ -88,6 +88,10 @@ Every pilot run used vLLM's built-in random dataset. It downloads nothing: it bu
 
 Every request in every run had exactly **1024 input tokens and 256 output tokens**, with a fixed seed. That makes comparisons across configurations clean. It also means the absolute numbers describe fixed-length synthetic traffic, not a production mix.
 
+Later stages added correctness prompts, GSM8K and real government reports (sections 7.1, 8.3 and 9.3). All five prompt types:
+
+![Five kinds of prompts, two jobs](figures/prompts.png)
+
 ### 4.3 Pilot configuration
 
 | Setting | Value | Why |
@@ -340,6 +344,10 @@ One hundred GovReport documents (GAO and CRS reports, median 9,033 tokens, up to
 | TP2 | 384.2 | 7.3 s | 59.4 s | 296 ms | 47.9 / 17.6 / 22.0 |
 
 The second node gives 1.78x on this workload, close to its 1.82x single-stream gain on short prompts. Time to first token halves (0.51x), because TP2 splits the prefill compute as well as the weight reads. Summary quality is unchanged (ROUGE-L 21.8 against 22.0).
+
+![Long documents move twice the tokens, almost all of it reading](figures/prompt_speed.png)
+
+At the same 16 users, long reports move twice the tokens per second of the synthetic workload, nearly all of it prefill, while each output token is about twice as slow (300 against 151 ms on TP2) because it attends over a 9,000-token context.
 
 Both setups failed the interactive targets set in advance (p95 TTFT under 15 s, p95 TPOT under 100 ms). At 16 long documents at a time, this is a batch workload: a report finishes every 9.4 s on TP2, but any single report can wait a minute for its first token.
 

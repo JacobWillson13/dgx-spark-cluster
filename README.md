@@ -1,5 +1,7 @@
 # Multi-Node LLM Inference on Two NVIDIA DGX Sparks
 
+![Cluster topology: a laptop and switch on the management network, two DGX Sparks joined by one ConnectX-7 cable](figures/topology.png)
+
 [![checks](https://github.com/JacobWillson13/dgx-spark-cluster/actions/workflows/ci.yml/badge.svg)](https://github.com/JacobWillson13/dgx-spark-cluster/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/code-MIT-2a78d6.svg)](LICENSE)
 [![Docs: CC BY 4.0](https://img.shields.io/badge/docs-CC%20BY%204.0-1baf7a.svg)](https://creativecommons.org/licenses/by/4.0/)
@@ -15,6 +17,16 @@ Two NVIDIA DGX Sparks joined by one 200 GbE cable and run as a single vLLM infer
 3. **Tensor parallelism beats pipeline parallelism over the link, 2x.** The pilot predicted the opposite. The deciding quantity is transfer volume (a few MB per token), not the link's bandwidth ratio. [Section 5](REPORT.md#5-predictions-and-outcomes)
 4. **FP8 is nearly free; NVFP4 is not.** On all 1,319 GSM8K problems, FP8 scored 1.8 points below BF16 and NVFP4 13.7 points below, both significant on a paired test. [Section 8.3](REPORT.md#83-precision-and-answer-quality)
 5. **Check correctness under load before trusting throughput.** A published two-Spark recipe reported 300 tok/s from a model that was answering every prompt with a numbered list. Here, 4,096 concurrent requests each returned their own answer and no one else's. [Sections 7.1, 9.4](REPORT.md#71-why-a-correctness-gate)
+
+## How it was tested
+
+![Five kinds of prompts: smoke pair, echo, random tokens, GSM8K and GovReport](figures/prompts.png)
+
+Two prompts check that the model is sane, and 256 simultaneous "repeat this number" requests check that no answer leaks between users. Only then are the workloads timed and scored: random tokens for raw speed, GSM8K word problems for the cost of lower precision, and real government reports for a practical number.
+
+![Long documents move twice the tokens, almost all of it reading](figures/prompt_speed.png)
+
+The same 16 users load the cluster very differently depending on the prompt. Long reports push twice as many tokens per second through it, almost all of it reading, yet each answer still takes longer to write, because every new token has 9,000 tokens of context behind it.
 
 ## Two Sparks: what to run
 
@@ -65,8 +77,6 @@ More figures, all regenerated from [`results/`](results/): the [link rate](figur
 Each prediction was written down before the run that tested it, and the misses stay in the record. Several of the most useful results came from misses: pipeline parallelism losing, the second node helping a single user, and two servers never overtaking one split server. Every prediction, its measured value and its report section: [`results/predictions.csv`](results/predictions.csv).
 
 ## The cluster
-
-![Cluster topology: a laptop and switch on the management network, two DGX Sparks joined by one ConnectX-7 cable](figures/topology.png)
 
 - **Hardware:** 2 x NVIDIA DGX Spark (GB10 Grace Blackwell, 128 GB unified memory at 273 GB/s, sm_121).
 - **Network:** a direct 200 GbE QSFP cable between the ConnectX-7 ports for inference traffic, driven over both PCIe paths for 196 Gb/s; a 10 GbE switch and a laptop on a private subnet for management.
