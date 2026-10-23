@@ -311,6 +311,165 @@ def parallelism():
     save(fig, "parallelism.png")
 
 
+def frontier():
+    path = RES / "sweep" / "sweep.csv"
+    if not path.exists():
+        print("skip frontier.png (no results/sweep/sweep.csv yet)")
+        return
+    r = [x for x in rows(path) if x["valid"] == "1"]
+    style = {"1N": ("One node", AQUA, "o"), "DP2": ("Two servers (DP2)", INK2, "s"),
+             "TP2": ("One server on both (TP2)", BLUE, "D")}
+    fig, ax = plt.subplots(figsize=(7, 4.2))
+    fig.subplots_adjust(top=0.78, left=0.11, right=0.97, bottom=0.13)
+    ax.grid(axis="x")
+    for cfg in ["1N", "DP2", "TP2"]:
+        pts = sorted((int(x["concurrency"]), float(x["output_tok_s"]), float(x["median_tpot_ms"]))
+                     for x in r if x["config"] == cfg)
+        name, color, marker = style[cfg]
+        ax.plot([p[1] for p in pts], [p[2] for p in pts], color=color, marker=marker, ms=5, lw=1.8, label=name)
+        for c, x, y in pts:
+            if c in (1, 4, 64, 256) or (cfg == "1N" and c == 128):
+                ax.annotate(f"{c}", (x, y), xytext=(5, -3), textcoords="offset points", fontsize=8, color=color)
+    ax.axhline(150, color=GRID, lw=1.2, ls="--", zorder=0)
+    ax.text(330, 118, "150 ms per token", fontsize=8, color=INK2, ha="right", va="top")
+    ax.set_xlabel("Total output tokens per second")
+    ax.set_ylabel("Median time per output token (ms)")
+    ax.set_ylim(0, 1350)
+    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=3, frameon=False, fontsize=9)
+    title(fig, "One server across both nodes matches or beats two",
+          "Qwen3.8-27B BF16, 1024 input / 256 output tokens. Labels are concurrent requests.")
+    save(fig, "frontier.png")
+
+
+def govreport():
+    path = RES / "sweep" / "govreport.csv"
+    if not path.exists():
+        print("skip govreport.png (no results/sweep/govreport.csv yet)")
+        return
+    r = {x["topology"]: x for x in rows(path)}
+    keys = [("1N", "One node", AQUA), ("TP2", "TP2, both nodes", BLUE)]
+    fig, axes = plt.subplots(1, 3, figsize=(7.6, 3.4))
+    fig.subplots_adjust(top=0.74, left=0.06, right=0.98, bottom=0.12, wspace=0.45)
+    for ax, (field, label, fmt) in zip(axes, [("reports_per_hour", "Reports per hour", "{:.0f}"),
+                                               ("median_ttft_s", "Median time to first token (s)", "{:.1f}"),
+                                               ("rougeL", "ROUGE-L", "{:.1f}")]):
+        vals = [float(r[k][field]) for k, _, _ in keys]
+        bars = ax.bar([n for _, n, _ in keys], vals, 0.6, color=[c for _, _, c in keys])
+        label_bars(ax, bars, lambda v, f=fmt: f.format(v))
+        ax.set_title(label, fontsize=9.5, color=INK2, loc="left")
+        ax.set_ylim(0, max(vals) * 1.2)
+        ax.tick_params(axis="x", labelsize=8.5)
+    title(fig, "Long reports: the second node adds 1.78x throughput at equal quality",
+          "100 GovReport documents (median 9,033 tokens), Qwen3.8-27B BF16, 16 at a time.")
+    save(fig, "govreport.png")
+
+
+def precision():
+    q = RES / "closing" / "quality.csv"
+    if not q.exists():
+        print("skip precision.png (no results/closing/quality.csv yet)")
+        return
+    full = {x["precision"]: float(x["gsm8k_flexible"]) * 100 for x in rows(q) if x["n_items"] == "1319"}
+    paired = {x["candidate"].split("-")[2].lower(): x for x in rows(RES / "closing" / "quality_paired.csv")
+              if x["filter"] == "flexible-extract"}
+    kv = {x["qwen_weights"].lower(): int(x["gpu_kv_tokens"]) for x in rows(RES / "phase0" / "precision_kv.csv")
+          if x["kv_cache_dtype"].startswith("auto")}
+    order = [("bf16", "BF16"), ("fp8", "FP8"), ("nvfp4", "NVFP4")]
+    colors = [AQUA, BLUE, INK2]
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(7.6, 3.6))
+    fig.subplots_adjust(top=0.74, left=0.08, right=0.98, bottom=0.12, wspace=0.35)
+    acc = [full[k] for k, _ in order]
+    lo_err, hi_err = [], []
+    for k, _ in order:
+        if k in paired:  # bar height is the candidate's accuracy; interval is of its difference from BF16
+            d, lo, hi = (float(paired[k][f]) for f in ("diff_points", "ci95_low", "ci95_high"))
+            lo_err.append(d - lo); hi_err.append(hi - d)
+        else:
+            lo_err.append(0); hi_err.append(0)
+    err = [lo_err, hi_err]
+    b = a1.bar([n for _, n in order], acc, 0.6, color=colors)
+    xi = [i for i, (k, _) in enumerate(order) if k in paired]
+    a1.errorbar(xi, [acc[i] for i in xi], yerr=[[err[0][i] for i in xi], [err[1][i] for i in xi]],
+                fmt="none", capsize=4, ecolor=INK, lw=1.2)
+    for bar, v in zip(b, acc):
+        a1.annotate(f"{v:.1f}%", (bar.get_x() + bar.get_width() / 2, v), xytext=(10, 3),
+                    textcoords="offset points", ha="left", fontsize=9, color=INK)
+    a1.set_ylim(0, 85)
+    a1.set_title("GSM8K accuracy, all 1,319 items", fontsize=9.5, color=INK2, loc="left")
+    cap = [kv[k] / kv["bf16"] for k, _ in order]
+    b2 = a2.bar([n for _, n in order], cap, 0.6, color=colors)
+    label_bars(a2, b2, lambda v: f"{v:.2f}x")
+    a2.set_ylim(0, 2.0)
+    a2.set_title("KV-cache capacity vs BF16, one node", fontsize=9.5, color=INK2, loc="left")
+    title(fig, "FP8 keeps accuracy; NVFP4 trades 14 points for capacity",
+          "Qwen3.8-27B one node. Error bars: paired 95% interval of the difference from BF16.")
+    save(fig, "precision.png")
+
+
+def overhead():
+    rr = {(x["model"], x["topology"]): float(x["median_tpot_ms"]) for x in rows(RES / "closing" / "pilot_rerun.csv")
+          if x["concurrency"] == "1"}
+    mem = {x["config"]: float(x["predicted_memory_ms"]) for x in rows(RES / "pilot" / "weight_streaming.csv")}
+    ar = {}
+    for x in rows(RES / "closing" / "allreduce.csv"):
+        ar.setdefault(x["model"], []).append(float(x["comm_ms_per_token"]))
+    cases = [("Qwen 27B one node", rr[("Qwen3.8-27B", "1N")], mem["Qwen 27B single node"], 0.0),
+             ("Qwen 27B TP2", rr[("Qwen3.8-27B", "TP2")], mem["Qwen 27B TP2"], sum(ar["Qwen3.8-27B"]) / len(ar["Qwen3.8-27B"])),
+             ("Llama 70B TP2", rr[("Llama-3.3-70B-Instruct", "TP2")], mem["Llama 70B TP2"],
+              sum(ar["Llama-3.3-70B-Instruct"]) / len(ar["Llama-3.3-70B-Instruct"]))]
+    fig, ax = plt.subplots(figsize=(7, 3.4))
+    fig.subplots_adjust(top=0.72, left=0.2, right=0.97, bottom=0.15)
+    ax.grid(axis="x"); ax.grid(axis="y", visible=False)
+    ys = list(range(len(cases)))[::-1]
+    for y, (name, total, m, c) in zip(ys, cases):
+        rest = total - m - c
+        ax.barh(y, m, 0.55, color=AQUA)
+        ax.barh(y, c, 0.55, left=m, color=BLUE)
+        ax.barh(y, rest, 0.55, left=m + c, color=INK2)
+        extra = f"+{c:.0f} comm, +{rest:.0f} other" if c else f"+{rest:.0f} other"
+        ax.text(total + 4, y, f"{total:.0f} ms ({extra})", va="center", fontsize=8.5, color=INK)
+    ax.set_yticks(ys, [c[0] for c in cases])
+    ax.set_xlim(0, 440)
+    ax.set_xlabel("Median time per output token at concurrency 1, compiled (ms)")
+    from matplotlib.patches import Patch
+    ax.legend(handles=[Patch(color=AQUA, label="Weight streaming (predicted)"),
+                       Patch(color=BLUE, label="Cross-node all-reduce (measured)"),
+                       Patch(color=INK2, label="Unexplained")],
+              loc="lower left", bbox_to_anchor=(-0.26, 1.0), ncol=3, frameon=False, fontsize=8.5, handlelength=1.0)
+    title(fig, "Where the per-token time goes", "Collectives explain Qwen's two-node overhead, not Llama's.")
+    save(fig, "overhead.png")
+
+
+def scaling():
+    path = RES / "sweep" / "sweep.csv"
+    if not path.exists():
+        print("skip scaling.png (no results/sweep/sweep.csv yet)")
+        return
+    r = {(x["config"], int(x["concurrency"])): float(x["output_tok_s"]) for x in rows(path) if x["valid"] == "1"}
+    cs = sorted(c for (cfg, c) in r if cfg == "1N" and c <= 128)  # 256 is past one node's KV ceiling
+    fig, ax = plt.subplots(figsize=(7, 3.6))
+    fig.subplots_adjust(top=0.74, left=0.1, right=0.97, bottom=0.14)
+    for cfg, name, color, marker in [("TP2", "TP2", BLUE, "D"), ("DP2", "DP2", INK2, "s")]:
+        pts = [(c, r[(cfg, c)] / r[("1N", c)]) for c in cs if (cfg, c) in r]
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], color=color, marker=marker, ms=5, lw=1.8, label=name)
+        for c, v in pts:
+            if c in (4, 64, 128):
+                ax.annotate(f"{v:.2f}x", (c, v), xytext=(0, 7 if cfg == "TP2" else -15), textcoords="offset points",
+                            ha="center", fontsize=8, color=color)
+    ax.axhline(1, color=GRID, lw=1.2)
+    ax.axhline(2, color=GRID, lw=1.2, ls="--")
+    ax.text(1, 2.04, "2x: perfect use of the second node", fontsize=8, color=INK2)
+    ax.set_xscale("log", base=2)
+    ax.set_xticks(cs, [str(c) for c in cs])
+    ax.set_ylim(0, 2.6)
+    ax.set_xlabel("Concurrent requests")
+    ax.set_ylabel("Throughput vs one node")
+    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=2, frameon=False, fontsize=9)
+    title(fig, "What the second Spark buys, by load",
+          "Two-node throughput over one node at the same concurrency, up to 128 (one node's KV limit).")
+    save(fig, "scaling.png")
+
+
 if __name__ == "__main__":
     topology()
     parallelism()
@@ -323,3 +482,8 @@ if __name__ == "__main__":
                   "Qwen3.8-27B, 1024 input / 256 output tokens, eager mode.")
     weight_streaming()
     eager_vs_compiled()
+    frontier()
+    govreport()
+    precision()
+    overhead()
+    scaling()
