@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use these measurements or scripts, please cite them as below."
+title: "Multi-Node LLM Inference on Two NVIDIA DGX Sparks"
+type: software
+authors:
+  - family-names: Willson
+    given-names: Jacob
+repository-code: "https://github.com/JacobWillson13/dgx-spark-cluster"
+date-released: 2026-10-23
+license: MIT
+keywords:
+  - DGX Spark
+  - vLLM
+  - tensor parallelism
+  - LLM inference
+  - benchmarking
