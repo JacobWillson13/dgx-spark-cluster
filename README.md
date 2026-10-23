@@ -39,10 +39,15 @@ Predictions were recorded before each pilot experiment and scored afterward (rep
 | Eager vs compiled | Llama 3.3 70B TP2, concurrency 1 | 289 vs 290 ms per token; constant unchanged |
 | GSM8K by precision | Qwen3.8 27B, all 1,319 items | BF16 73.1%, FP8 71.3%, NVFP4 59.4% |
 | Cross-node all-reduce | 16 KB message, inside a CUDA graph | about 55 µs |
+| TP2 vs two servers | Qwen3.8 27B, 4 to 256 concurrent | TP2 ahead at every load: 1.77x at 4, tied at 256 |
+| Peak throughput | Qwen3.8 27B, 256 concurrent | TP2 324 tok/s; one node 170 tok/s |
+| Long documents | 100 GovReport reports, 16 at a time | 384 reports/hour on TP2, 215 on one node, same ROUGE |
 
 ![Tensor parallelism versus pipeline parallelism, Llama 3.3 70B](figures/tp_vs_pp.png)
 
-**Status:** complete. The pilot ran in eager mode; a closing rerun on the compiled native stack, with predictions committed in advance, is in [report section 8](REPORT.md#8-revisiting-the-pilot-on-the-compiled-stack).
+**Status:** complete. The pilot ran in eager mode; a closing rerun on the compiled native stack is in [report section 8](REPORT.md#8-revisiting-the-pilot-on-the-compiled-stack), and the concurrency sweep and long-document test are in [section 9](REPORT.md#9-when-the-second-spark-is-worth-it). Every set of runs had its predictions committed in advance.
+
+![One server across both nodes matches or beats two](figures/frontier.png)
 
 ## Setup screenshots
 

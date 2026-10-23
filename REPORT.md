@@ -4,7 +4,7 @@ Jacob Willson · October 2026
 
 ## 1. Summary
 
-Two NVIDIA DGX Spark systems were joined over a direct 200 GbE ConnectX-7 cable and run as one vLLM inference cluster. The work had three stages: a pilot that compared parallelism strategies with predictions recorded in advance, a calibration phase that moved to a native software stack and built a correctness-gated measurement method, and a closing rerun of the pilot on that stack.
+Two NVIDIA DGX Spark systems were joined over a direct 200 GbE ConnectX-7 cable and run as one vLLM inference cluster. The work had three stages: a pilot that compared parallelism strategies with predictions recorded in advance, a calibration phase that moved to a native software stack and built a correctness-gated measurement method, a closing rerun of the pilot on that stack, and a concurrency sweep with a real long-document workload to decide how a second Spark should be used.
 
 Main results:
 
@@ -14,6 +14,8 @@ Main results:
 - **Decode efficiency:** single-stream decode reached 87.7% of the 273 GB/s memory-bandwidth ceiling. In eager mode, every configuration also paid about 30 ms per forward pass beyond weight streaming.
 - **Compiled stack:** CUDA graphs removed most of the 30 ms constant on Qwen3.8 27B (29 to 9 ms on one node, about 30 to 15 ms with TP2) and none of it on Llama 3.3 70B TP2. Measured cross-node collectives explain under a third of Llama's remainder.
 - **Precision:** on all 1,319 GSM8K items, FP8 scored 1.8 points below BF16 and NVFP4 13.7 points below, both significant on a paired test.
+- **How to use the second Spark:** one server split across both nodes (TP2) matched or beat two independent servers at every load from 4 to 256 concurrent requests: 1.77x their throughput at 4, even at 256 (324 against 323 tok/s). TP2 peaked at 1.90x one node.
+- **Long documents:** summarizing 100 government reports, TP2 delivered 384 reports per hour against 215 on one node (1.78x), at the same summary quality.
 - **Correctness gate:** on the native stack, each configuration had to return correct answers, with no cross-request contamination, under concurrent load before its throughput was counted.
 
 ![Line rate needs both PCIe paths](figures/interconnect.png)
@@ -276,19 +278,91 @@ Together with section 7: NVFP4 holds 1.64x the KV-cache tokens of BF16 and costs
 
 The absolute scores reflect this harness (raw completions prompts, no chat template, thinking off) and should not be compared with published GSM8K results. Compare across precisions only.
 
-## 9. Known limits
+## 9. When the second Spark is worth it
+
+Sections 6 and 8 measured two load points. This section sweeps load from 1 to 256 concurrent requests for three ways to use the hardware, then repeats the one-node versus two-node comparison on a real long-document workload. Eight predictions were committed before the runs. Data: [`results/sweep/`](results/sweep/).
+
+| Setup | What runs | Memory fraction |
+|---|---|---|
+| One node | Qwen3.8 27B BF16 on one Spark | 0.85 |
+| TP2 | One server split across both Sparks | 0.80 per node |
+| DP2 | Two independent copies, one per Spark, requests split evenly | 0.80 per node |
+
+Every server ran with up to 256 concurrent sequences and passed the section 7.1 gate at 256 concurrent requests, plus three more echo seeds at the same concurrency. Same synthetic workload as the pilot (1024 input / 256 output tokens), client on the second Spark.
+
+![One server across both nodes matches or beats two](figures/frontier.png)
+
+| Concurrency | One node, tok/s | DP2, tok/s | TP2, tok/s | TP2 over DP2 | TP2 median TPOT |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 4.7 | | 8.5 | | 116 ms |
+| 4 | 17.6 | 18.0 | 31.8 | 1.77x | 120 ms |
+| 16 | 57.5 | 64.9 | 100.8 | 1.55x | 151 ms |
+| 32 | 93.1 | 117.7 | 162.1 | 1.38x | 170 ms |
+| 64 | 163.8 | 206.6 | 285.5 | 1.38x | 212 ms |
+| 128 | 170.4 | 266.9 | 294.1 | 1.10x | 314 ms |
+| 256 | 143.8 | 322.6 | 324.2 | 1.00x | 531 ms |
+
+DP2 at concurrency 1 is not defined: one request reaches only one server.
+
+### 9.1 TP2 never lost
+
+The prediction was that two independent servers would overtake TP2 once there was enough load to keep both busy. They did not: TP2's lead shrank from 1.77x at 4 requests to a tie at 256, and never reversed.
+
+The reason is the same as in section 6.2. TP2 makes both nodes read half the weights for every token, so each request runs about twice as fast. DP2 runs two requests at one-node speed. At low load TP2's speed wins outright; at saturation both setups are limited by the same two memory systems and deliver the same total. TP2 also pools both nodes' KV cache into one scheduler, which helps it absorb uneven load.
+
+**Practical reading:** on this hardware, a second Spark is better used as half of one server than as a second server, at every load measured. Running two copies buys nothing TP2 does not, and loses per-request speed. TP2 is also the only setup that stays under 150 ms per token (about reading speed): up to 16 concurrent requests. One node and DP2 never get below 212 ms.
+
+### 9.2 One node runs out of room
+
+One node peaked at 170 tok/s at 128 requests and fell to 144 at 256, with median time per token rising from 555 ms to 1,257 ms. At 256 requests it exceeds its KV-cache capacity (about 191 sequences, section 7), so requests wait or are preempted. Neither two-node setup reached that wall within 256.
+
+### 9.3 Long documents
+
+One hundred GovReport documents (GAO and CRS reports, median 9,033 tokens, up to 25,739), each summarized in three parts with up to 1,024 output tokens, 16 at a time, thinking off. Quality is ROUGE against the expert-written summaries.
+
+![Long reports: the second node adds 1.78x throughput](figures/govreport.png)
+
+| Setup | Reports per hour | Median TTFT | p95 TTFT | Median TPOT | ROUGE-1 / 2 / L |
+|---|---:|---:|---:|---:|---|
+| One node | 215.5 | 14.5 s | 99.3 s | 525 ms | 47.5 / 17.5 / 21.8 |
+| TP2 | 384.2 | 7.3 s | 59.4 s | 296 ms | 47.9 / 17.6 / 22.0 |
+
+The second node gives 1.78x on this workload, close to its 1.82x single-stream gain on short prompts. Time to first token halves (0.51x), because TP2 splits the prefill compute as well as the weight reads. Summary quality is unchanged (ROUGE-L 21.8 against 22.0).
+
+Both setups failed the interactive targets set in advance (p95 TTFT under 15 s, p95 TPOT under 100 ms). At 16 long documents at a time, this is a batch workload: a report finishes every 9.4 s on TP2, but any single report can wait a minute for its first token.
+
+### 9.4 Correctness at scale
+
+Across the session, 16 echo checks at 256 concurrent requests (4,096 requests) and two at 64 returned every request's own number and no other request's. Zero failures in 4,096 bounds the contamination rate below 0.07% at 95% confidence.
+
+### 9.5 Predictions
+
+| Prediction | Predicted | Measured | Outcome |
+|---|---|---|---|
+| S1. One-node ceiling | 135 to 150 tok/s by 128 requests | 170.4 at 128, then 143.8 at 256 | **Falsified:** higher, then fell |
+| S2. DP2 against one node at half the concurrency | 1.9x to 2.0x from 64 up | 2.22x, 1.63x, 1.89x at 64, 128, 256 | **Falsified:** wider spread; DP2 ran at 0.80 against one node's 0.85 |
+| S3. TP2 against DP2 | TP2 ahead up to 64; DP2 overtakes at 128 or 256 | TP2 ahead at every point, tied at 256 | **Falsified:** DP2 never overtook |
+| S4. Under 150 ms per token | One node and DP2 never; TP2 up to 4 to 16 | One node and DP2 never; TP2 up to 16 (151 ms) | **Confirmed** |
+| E1. Cross-request contamination | zero in at least 3,072 requests at 256 | zero in 4,096 | **Confirmed** |
+| G1. GovReport, TP2 over one node | 1.7x to 2.0x | 1.78x | **Confirmed** |
+| G2. GovReport quality | ROUGE-L within 0.5 | +0.2 | **Confirmed** |
+| G3. GovReport TTFT | TP2 at most 0.6x one node | 0.51x | **Confirmed** |
+
+**One run was stopped and repeated.** The first DP2 attempt ran its server at 0.85 on the node that also hosted the benchmark client. The client took free memory under the watchdog's 6 GiB threshold, and the watchdog stopped that server seven seconds into the sweep. The cause and the rerun settings (0.80 on both nodes, the same as TP2) were recorded before the rerun. The stopped attempt's data is not used.
+
+## 10. Known limits
 
 - **Nemotron 3 Super 120B (NVFP4) did not serve.** With every kernel prebuilt offline, the launch completed CUDA graph capture, then free memory fell below 6 GiB during MoE kernel autotuning (peak 115.9 GiB in use). The memory watchdog stopped it, as designed. The allocation behind the growth was not isolated.
 - **Llama 3.3 70B TP2 keeps about 22 ms of unexplained per-token overhead with CUDA graphs on,** after subtracting measured collectives. Graph capture was confirmed; the step was not profiled (section 8.1).
 - **DeepSeek V4 Flash did not serve.** A second stock attempt reached a DeepGEMM JIT compile and was stopped by rule; a bounded compile was not tried (section 8.2).
 - **One quality benchmark.** GSM8K measures multi-step arithmetic only. NVFP4's 14-point loss was not traced to the checkpoint or the kernels, and absolute scores are specific to this harness (section 8.3).
 - **Gemma 4 was not served.** The test plan required someone physically present in case a launch hung the machine, and that session did not happen.
-- **No full concurrency sweep.** The single-node ceiling was located (about 191 sequences), but the accepted throughput curve at each configuration's ceiling was not run.
+- **One model in the sweep.** The concurrency sweep and GovReport used Qwen3.8 27B BF16 only. A model too large for one node (Llama 3.3 70B) was not swept.
 - **Power is board-reported.** GPU-reported SoC power, not wall power.
-- **One hardware pair, synthetic traffic.** Results describe two DGX Sparks on a direct link with fixed-length prompts, not larger servers or production request mixes.
+- **One hardware pair, mostly synthetic traffic.** Results describe two DGX Sparks on a direct link. Apart from GovReport (section 9.3), prompts are fixed-length synthetic text, not production request mixes.
 - **No fine-tuning.** Every model runs as published.
 
-## 10. How it was run
+## 11. How it was run
 
 The cluster was operated from a laptop. Planning, review and documentation were done with an AI assistant (Claude). Execution was handed to a coding agent (OpenAI Codex) that ran commands on both nodes over SSH, following written procedures ([`docs/VALIDATION.md`](docs/VALIDATION.md)).
 
@@ -299,7 +373,7 @@ Guardrails made it safe to leave the agent running:
 - **Hard stop rules.** No retries after an out-of-memory stop, a hang, a GPU error or a failed correctness gate. No unattended reboots. The agent stops and reports.
 - **Correctness before throughput.** No number counted until its configuration passed the gate in section 7.1.
 
-The Nemotron stop in section 9 is the guardrails working: the watchdog ended the launch before the node ran out of memory, and the agent stopped instead of retrying.
+The Nemotron stop in section 10 is the guardrails working: the watchdog ended the launch before the node ran out of memory, and the agent stopped instead of retrying.
 
 ## Appendix: reproducing
 

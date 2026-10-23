@@ -311,6 +311,59 @@ def parallelism():
     save(fig, "parallelism.png")
 
 
+def frontier():
+    path = RES / "sweep" / "sweep.csv"
+    if not path.exists():
+        print("skip frontier.png (no results/sweep/sweep.csv yet)")
+        return
+    r = [x for x in rows(path) if x["valid"] == "1"]
+    style = {"1N": ("One node", AQUA, "o"), "DP2": ("Two servers (DP2)", INK2, "s"),
+             "TP2": ("One server on both (TP2)", BLUE, "D")}
+    fig, ax = plt.subplots(figsize=(7, 4.2))
+    fig.subplots_adjust(top=0.78, left=0.11, right=0.97, bottom=0.13)
+    ax.grid(axis="x")
+    for cfg in ["1N", "DP2", "TP2"]:
+        pts = sorted((int(x["concurrency"]), float(x["output_tok_s"]), float(x["median_tpot_ms"]))
+                     for x in r if x["config"] == cfg)
+        name, color, marker = style[cfg]
+        ax.plot([p[1] for p in pts], [p[2] for p in pts], color=color, marker=marker, ms=5, lw=1.8, label=name)
+        for c, x, y in pts:
+            if c in (1, 4, 64, 256) or (cfg == "1N" and c == 128):
+                ax.annotate(f"{c}", (x, y), xytext=(5, -3), textcoords="offset points", fontsize=8, color=color)
+    ax.axhline(150, color=GRID, lw=1.2, ls="--", zorder=0)
+    ax.text(330, 118, "150 ms per token", fontsize=8, color=INK2, ha="right", va="top")
+    ax.set_xlabel("Total output tokens per second")
+    ax.set_ylabel("Median time per output token (ms)")
+    ax.set_ylim(0, 1350)
+    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=3, frameon=False, fontsize=9)
+    title(fig, "One server across both nodes matches or beats two",
+          "Qwen3.8-27B BF16, 1024 input / 256 output tokens. Labels are concurrent requests.")
+    save(fig, "frontier.png")
+
+
+def govreport():
+    path = RES / "sweep" / "govreport.csv"
+    if not path.exists():
+        print("skip govreport.png (no results/sweep/govreport.csv yet)")
+        return
+    r = {x["topology"]: x for x in rows(path)}
+    keys = [("1N", "One node", AQUA), ("TP2", "TP2, both nodes", BLUE)]
+    fig, axes = plt.subplots(1, 3, figsize=(7.6, 3.4))
+    fig.subplots_adjust(top=0.74, left=0.06, right=0.98, bottom=0.12, wspace=0.45)
+    for ax, (field, label, fmt) in zip(axes, [("reports_per_hour", "Reports per hour", "{:.0f}"),
+                                               ("median_ttft_s", "Median time to first token (s)", "{:.1f}"),
+                                               ("rougeL", "ROUGE-L", "{:.1f}")]):
+        vals = [float(r[k][field]) for k, _, _ in keys]
+        bars = ax.bar([n for _, n, _ in keys], vals, 0.6, color=[c for _, _, c in keys])
+        label_bars(ax, bars, lambda v, f=fmt: f.format(v))
+        ax.set_title(label, fontsize=9.5, color=INK2, loc="left")
+        ax.set_ylim(0, max(vals) * 1.2)
+        ax.tick_params(axis="x", labelsize=8.5)
+    title(fig, "Long reports: the second node adds 1.78x throughput at equal quality",
+          "100 GovReport documents (median 9,033 tokens), Qwen3.8-27B BF16, 16 at a time.")
+    save(fig, "govreport.png")
+
+
 if __name__ == "__main__":
     topology()
     parallelism()
@@ -323,3 +376,5 @@ if __name__ == "__main__":
                   "Qwen3.8-27B, 1024 input / 256 output tokens, eager mode.")
     weight_streaming()
     eager_vs_compiled()
+    frontier()
+    govreport()
