@@ -244,6 +244,8 @@ Graph capture was confirmed in the Llama log, including batch size 1, so the rem
 - **Llama does not.** Subtracting its collectives leaves about 22 ms, more than twice Qwen's base. That remainder was not isolated; a profile of one Llama decode step is the next measurement.
 - **Collectives are slower inside a graph.** In the same test, eagerly enqueued all-reduces took 18 to 20 µs each, about a third of the graph-replayed time. At Llama's 160 per token, that difference is about 5.6 ms. Why NCCL is slower inside a graph on this link was not investigated.
 
+![Where the per-token time goes](figures/overhead.png)
+
 The practical reading: for a model that fits on one node, compiled execution brings decode within 5% of the memory-bandwidth ceiling. For the 70B model that needs two nodes, about 22 ms per token beyond weight streaming and collectives is still unaccounted for.
 
 ### 8.2 DeepSeek V4 Flash on the stock stack
@@ -269,6 +271,8 @@ Qwen3.8 27B on one node at each precision, full gate first, then GSM8K: 5-shot, 
 | BF16 | 73.1% | 70.5% | | | 67.5% |
 | FP8 | 71.3% | 68.9% | -1.8 (-3.5 to -0.2) | 0.037 | 70.5% |
 | NVFP4 | 59.4% | 55.8% | -13.7 (-16.2 to -11.1) | < 0.0001 | 62.0% |
+
+![FP8 keeps accuracy; NVFP4 trades 14 points for capacity](figures/precision.png)
 
 - **NVFP4 loses about 14 points.** On the same items, BF16 answered 249 correctly that NVFP4 missed; NVFP4 answered 69 that BF16 missed. Strict match agrees (-14.7). That is more than twice the predicted 2 to 6 points, and larger than losses usually reported for 4-bit formats. Whether the cause is the checkpoint's quantization or the sm_121 NVFP4 kernels (section 7.2 lists a silent output-layer fallback) was not isolated.
 - **FP8 costs about 2 points.** Small, but significant on flexible extract (p = 0.037) and borderline on strict match (p = 0.053).
@@ -309,6 +313,10 @@ DP2 at concurrency 1 is not defined: one request reaches only one server.
 The prediction was that two independent servers would overtake TP2 once there was enough load to keep both busy. They did not: TP2's lead shrank from 1.77x at 4 requests to a tie at 256, and never reversed.
 
 The reason is the same as in section 6.2. TP2 makes both nodes read half the weights for every token, so each request runs about twice as fast. DP2 runs two requests at one-node speed. At low load TP2's speed wins outright; at saturation both setups are limited by the same two memory systems and deliver the same total. TP2 also pools both nodes' KV cache into one scheduler, which helps it absorb uneven load.
+
+![What the second Spark buys, by load](figures/scaling.png)
+
+The ratio view makes the gap plain. TP2 delivers 1.73x to 1.82x one node at every load up to 128. DP2 starts at 1.02x, because at 4 requests each copy serves two at one-node speed, and climbs only as load fills both copies.
 
 **Practical reading:** on this hardware, a second Spark is better used as half of one server than as a second server, at every load measured. Running two copies buys nothing TP2 does not, and loses per-request speed. TP2 is also the only setup that stays under 150 ms per token (about reading speed): up to 16 concurrent requests. One node and DP2 never get below 212 ms.
 
