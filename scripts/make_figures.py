@@ -470,6 +470,61 @@ def scaling():
     save(fig, "scaling.png")
 
 
+def scorecard():
+    r = rows(RES / "predictions.csv")
+    studies = [("pilot", "Pilot"), ("closing", "Compiled rerun"), ("followup", "Follow-ups"), ("sweep", "Sweep and GovReport")]
+    look = {"confirmed": (BLUE, "white", "held"), "partly confirmed": ("#a9c8ee", INK, "partly"),
+            "falsified": ("#e9e8e4", INK, "missed"), "not tested": (SURFACE, INK2, "not run")}
+    fig, ax = plt.subplots(figsize=(7.6, 3.5))
+    fig.subplots_adjust(top=0.78, left=0.02, right=0.98, bottom=0.04)
+    ax.set_xlim(-2.9, 8.2); ax.set_ylim(-0.6, len(studies) - 0.4)
+    ax.axis("off")
+    from matplotlib.patches import FancyBboxPatch
+    for yi, (key, name) in enumerate(studies):
+        y = len(studies) - 1 - yi
+        ax.text(-2.85, y, name, va="center", fontsize=9.5, color=INK2)
+        for xi, x in enumerate([q for q in r if q["study"] == key]):
+            fc, tc, word = look[x["outcome"]]
+            ax.add_patch(FancyBboxPatch((xi - 0.44, y - 0.36), 0.88, 0.72, boxstyle="round,pad=0,rounding_size=0.08",
+                                        fc=fc, ec=BLUE if x["outcome"] != "falsified" and fc != BLUE else GRID, lw=1))
+            ax.text(xi, y + 0.1, x["id"], ha="center", va="center", fontsize=9.5, weight="semibold", color=tc)
+            ax.text(xi, y - 0.17, word, ha="center", va="center", fontsize=7, color=tc)
+    n = {k: sum(1 for q in r if q["outcome"] == k) for k in look}
+    title(fig, f"{n['confirmed']} of {len(r)} predictions held",
+          f"Each recorded before its run. {n['falsified']} missed, {n['partly confirmed']} held in part, "
+          f"{n['not tested']} could not run. Details: results/predictions.csv.")
+    save(fig, "scorecard.png")
+
+
+def banner(name="banner.png", size=(12, 3.2), social=False):
+    sw = {x["config"] + x["concurrency"]: float(x["output_tok_s"]) for x in rows(RES / "sweep" / "sweep.csv")}
+    gr = {x["topology"]: float(x["reports_per_hour"]) for x in rows(RES / "sweep" / "govreport.csv")}
+    echo = sum(int(x["owned"]) + int(x["failed"]) for x in rows(RES / "sweep" / "echo.csv") if x["concurrency"] == "256")
+    bad = sum(int(x["failed"]) for x in rows(RES / "sweep" / "echo.csv"))
+    link = max(float(x["aggregate_gbps"]) for x in rows(RES / "pilot" / "interconnect.csv"))
+    stats = [(f"{link:.0f} Gb/s", "node-to-node link,\n98% of line rate"),
+             (f"{sw['TP2256'] / sw['1N128']:.2f}x", "peak throughput, two nodes\nas one server vs one node"),
+             (f"{gr['TP2']:.0f}", "government reports\nsummarized per hour"),
+             (f"{bad} / {echo:,}", "cross-request mix-ups\nat 256 concurrent")]
+    fig = plt.figure(figsize=size)
+    ax = fig.add_axes([0, 0, 1, 1]); ax.axis("off"); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    h = size[1]
+    inch = lambda v: v / h  # vertical offsets in inches, so both sizes lay out alike
+    top = 0.58 if not social else 0.40
+    if social:
+        ax.text(0.05, 0.84, "Two DGX Sparks, one inference cluster", fontsize=28, weight="semibold", color=INK, va="center")
+        ax.text(0.05, 0.84 - inch(0.75), "Multi-node vLLM on a direct 200 GbE link: measured, gated for correctness,\npredictions recorded first",
+                fontsize=13, color=INK2, va="center", linespacing=1.4)
+        ax.text(0.05, inch(0.45), "github.com/JacobWillson13/dgx-spark-cluster", fontsize=11, color=INK2)
+    for i, (big, small) in enumerate(stats):
+        x = 0.05 + i * 0.235
+        ax.plot([x - 0.015, x - 0.015], [top - inch(0.62), top + inch(0.28)], color=BLUE if i else AQUA, lw=3,
+                solid_capstyle="butt")
+        ax.text(x, top, big, fontsize=30, weight="semibold", color=INK, va="center")
+        ax.text(x, top - inch(0.38), small, fontsize=11, color=INK2, va="top", linespacing=1.3)
+    save(fig, name)
+
+
 if __name__ == "__main__":
     topology()
     parallelism()
@@ -487,3 +542,6 @@ if __name__ == "__main__":
     precision()
     overhead()
     scaling()
+    scorecard()
+    banner(size=(12, 1.7))
+    banner("social-preview.png", (12.8, 6.4), social=True)

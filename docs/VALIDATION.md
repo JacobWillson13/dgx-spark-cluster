@@ -454,7 +454,7 @@ and passes.
 
 Every script lives in [`validation/bin/`](../validation/bin/); install them at
 `~/validation/bin/` on both Sparks. Unit tests: `python -m unittest test_check
-test_memory_watchdog` from `validation/`.
+test_memory_watchdog test_analysis` from `validation/`.
 
 | Script | Purpose |
 |---|---|
@@ -469,6 +469,9 @@ test_memory_watchdog` from `validation/`.
 | `sample_metrics.py` | Samples `/metrics` every 2 s into a CSV |
 | `make_workload_a.py`, `aiperf_workload_a.sh`, `d3_clients.sh` | Server-verified 1024/256 inputs and the AIPerf / `vllm bench serve` cross-check |
 | `analyze_window.py`, `compare_d3.py` | Steady-state window and harness comparison |
+| `sweep.sh`, `sweep_csv.py` | Concurrency sweep against one or two endpoints, with endpoint health checks; merges results into one CSV and flags invalid points |
+| `allreduce_lat.py` | Cross-node all-reduce latency at decode-sized messages, eager and replayed in a CUDA graph (run with `torchrun`, no server up) |
+| `paired_gsm8k.py` | Item-by-item comparison of two lm-eval GSM8K runs: paired interval and exact McNemar test |
 
 ## 6.1 `check.py`
 

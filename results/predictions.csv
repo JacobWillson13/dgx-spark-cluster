@@ -1,0 +1,21 @@
+study,id,prediction,predicted,measured,outcome,report_section
+pilot,1,Single-stream decode efficiency,80 to 90% of the memory-bandwidth ceiling,87.7% (TP2) and 87.3% (PP2),confirmed,5
+pilot,2,DeepSeek V4 Flash faster than Llama 3.3 70B,much faster (about 11x fewer active parameters),not served on the pilot stack,not tested,5
+pilot,3,Pipeline beats tensor parallelism across the link,PP2 wins,TP2 2.01x faster single-stream,falsified,5
+pilot,4,Second node helps only under load,no single-stream gain,1.57x single-stream,falsified,5
+closing,P1,Per-token overhead with CUDA graphs,12 ms or less in all three configs,9.1 / 14.8 / 31.0 ms,falsified,8
+closing,P2,Qwen two-node speedup,1.80x to 1.95x,1.82x,confirmed,8
+closing,P3,Concurrency-32 throughput gain,5% to 35% higher in each config,+19% / +25% / -2%,falsified,8
+closing,P4,DeepSeek V4 Flash on the stock stack,more likely fails than serves,failed before loading weights,confirmed,8.2
+closing,P5,GSM8K precision gap (200 items),FP8 within 2 and NVFP4 within 3 points,+3.0 / -5.5 (unresolvable at n=200),falsified,8.3
+followup,F1,Cross-node all-reduce latency in a CUDA graph,10 to 40 us; under a third of Llama's residual,about 55 us; 28 to 29% of the residual,partly confirmed,8.1
+followup,F2,DeepSeek attempt with an FP8 KV cache,fails on a kernel or architecture error,stopped by rule at a DeepGEMM JIT compile,partly confirmed,8.2
+followup,F3,GSM8K precision gap (all 1319 items),FP8 not significant; NVFP4 2 to 6 points below,FP8 -1.8 (p=0.037); NVFP4 -13.7,falsified,8.3
+sweep,S1,One-node throughput ceiling,135 to 150 tok/s by 128 requests,170.4 then 143.8 at 256,falsified,9.5
+sweep,S2,DP2 against one node at half the concurrency,1.9x to 2.0x from 64 up,2.22x / 1.63x / 1.89x,falsified,9.5
+sweep,S3,TP2 against two independent servers,DP2 overtakes at 128 or 256,TP2 ahead at every point; tied at 256,falsified,9.5
+sweep,S4,Concurrency under 150 ms per token,TP2 up to 4 to 16; others never,TP2 up to 16; others never,confirmed,9.5
+sweep,E1,Cross-request contamination,zero in at least 3072 requests,zero in 4096,confirmed,9.4
+sweep,G1,GovReport throughput TP2 over one node,1.7x to 2.0x,1.78x,confirmed,9.3
+sweep,G2,GovReport summary quality,ROUGE-L within 0.5,+0.2,confirmed,9.3
+sweep,G3,GovReport time to first token,TP2 at most 0.6x one node,0.51x,confirmed,9.3

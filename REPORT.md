@@ -18,6 +18,10 @@ Main results:
 - **Long documents:** summarizing 100 government reports, TP2 delivered 384 reports per hour against 215 on one node (1.78x), at the same summary quality.
 - **Correctness gate:** on the native stack, each configuration had to return correct answers, with no cross-request contamination, under concurrent load before its throughput was counted.
 
+Twenty predictions were recorded across the four stages, each before its run; eight held. The scorecard is below, with every prediction in [`results/predictions.csv`](results/predictions.csv).
+
+![8 of 20 predictions held](figures/scorecard.png)
+
 ![Line rate needs both PCIe paths](figures/interconnect.png)
 
 ## 2. System

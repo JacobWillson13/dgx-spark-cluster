@@ -1,0 +1,24 @@
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit tests
+        working-directory: validation
+        run: python -m unittest -v test_check test_memory_watchdog test_analysis
+      - name: Scrub check
+        run: bash scripts/scrub_check.sh
+      - name: Figures regenerate from results
+        run: |
+          pip install -r requirements.txt
+          python scripts/make_figures.py
